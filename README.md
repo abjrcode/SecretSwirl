@@ -4,6 +4,13 @@
 
 Rotate your secrets and live worry free!
 
+# Requirements
+
+- [Golang 1.21.x](https://go.dev/dl/)
+- [NodeJS 18.x.x](https://nodejs.org/en/) Recommended to use [nvm](https://github.com/nvm-sh/nvm#installing-and-updating) or [windows-nvm](https://github.com/coreybutler/nvm-windows#installation--upgrades) to manage NodeJS versions.
+- [Wails 2.6.x](https://wails.io/docs/gettingstarted/installation#platform-specific-dependencies)
+  - Then run `wails doctor` to ensure you have all the correct system-level dependencies installed.
+
 ## Live Development
 
 To run in live development mode:
