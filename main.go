@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"fmt"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -11,13 +12,15 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+var Version string = "0.0.0"
+
 func main() {
 	// Create an instance of the app structure
 	app := NewApp()
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:  "SecretSwirl",
+		Title:  fmt.Sprintf("SecretSwirl - %s", Version),
 		Width:  1024,
 		Height: 768,
 		AssetServer: &assetserver.Options{

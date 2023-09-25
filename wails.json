@@ -8,5 +8,11 @@
   "frontend:dev:serverUrl": "auto",
   "author": {
     "name": "Ibrahim Najjar"
+  },
+  "info": {
+    "companyName": "Madin",
+    "productVersion": "0.0.1",
+    "copyright": "Licensed under MIT",
+    "comments": "Rotate your secrets and live worry free!"
   }
 }

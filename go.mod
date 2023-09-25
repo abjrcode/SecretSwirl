@@ -1,4 +1,4 @@
-module changeme
+module github.com/abjrcode/SecretSwirl
 
 go 1.18
 
