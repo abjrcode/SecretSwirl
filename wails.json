@@ -1,7 +1,7 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "SecretSwirl",
-  "outputfilename": "SecretSwirl",
+  "name": "Swervo",
+  "outputfilename": "Swervo",
   "frontend:install": "npm install",
   "frontend:build": "npm run build",
   "frontend:dev:watcher": "npm run dev",
@@ -11,8 +11,8 @@
   },
   "info": {
     "companyName": "Madin",
-    "productVersion": "0.0.1",
-    "copyright": "Licensed under MIT",
+    "productVersion": "0.0.0.0",
+    "copyright": "Copyright (c) 2023 Ibrahim Najjar",
     "comments": "Rotate your secrets and live worry free!"
   }
 }

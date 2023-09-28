@@ -1,0 +1,32 @@
+name: Main
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: swervo-main
+  cancel-in-progress: true
+
+jobs:
+  LinuxCI:
+    uses: ./.github/workflows/build-linux.yaml
+
+    permissions:
+      contents: read
+      packages: write
+
+    with:
+      GO_VERSION: "1.21.1"
+      NODE_VERSION: "18"
+      WAILS_VERSION: "v2.6.0"
+
+  DarwinCI:
+    uses: ./.github/workflows/build-darwin.yaml
+
+    with:
+      GO_VERSION: "1.21.1"
+      NODE_VERSION: "18"
+      WAILS_VERSION: "v2.6.0"

@@ -1,0 +1,92 @@
+name: Linux Build
+
+on:
+  workflow_call:
+    inputs:
+      GO_VERSION:
+        type: string
+        description: "Full Go version to use, e.g. 1.21.1"
+        required: true
+      NODE_VERSION:
+        type: string
+        description: "Node version to use, e.g. 18, 20 etc"
+        required: true
+      WAILS_VERSION:
+        type: string
+        description: "Wails version to use, e.g. v2.6.0"
+        required: true
+    outputs:
+      ReleaseTag:
+        value: ${{ jobs.Build.outputs.releaseTag }}
+
+jobs:
+  Build:
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      releaseTag: ${{ steps.calculateReleaseTag.outputs.releaseTag }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate Build Timestamp ISO 8601
+        id: generateBuildTimestamp
+        run: |
+          BUILD_TIMESTAMP=$(date +'%Y-%m-%dT%H:%M:%S') && echo "BUILD_TIMESTAMP=$BUILD_TIMESTAMP" >> $GITHUB_OUTPUT
+
+      - name: Calculate Release Tag
+        id: calculateReleaseTag
+        run: |
+          RELEASE_TAG=$(git describe --tags) && echo $RELEASE_TAG && echo "releaseTag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Wails Application
+        uses: docker/build-push-action@v4
+        env:
+          RELEASE_TAG: ${{ steps.calculateReleaseTag.outputs.releaseTag }}
+        with:
+          push: false
+          tags: |
+            swervo_builder
+          load: true
+          cache-from: |
+            type=registry,ref=ghcr.io/abjrcode/swervo/cache
+          cache-to: type=registry,ref=ghcr.io/abjrcode/swervo/cache,mode=max
+          build-args: |
+            GO_VERSION=${{ inputs.GO_VERSION }}
+            WAILS_VERSION=${{ inputs.WAILS_VERSION }}
+            NODE_MAJOR_VERSION=${{ inputs.NODE_VERSION }}
+            RELEASE_TAG=${{ env.RELEASE_TAG }}
+            BUILD_TIMESTAMP=${{ steps.generateBuildTimestamp.outputs.BUILD_TIMESTAMP }}
+            COMMIT_SHA=${{ github.sha }}
+            BUILD_LINK=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Extract Build Artifacts
+        run: |
+          docker run --rm -v $(pwd)/build/bin:/artifacts swervo_builder
+
+      - name: Upload Build Arifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: release_bins
+          path: ./build/bin/*
+          if-no-files-found: error
+          retention-days: 1
