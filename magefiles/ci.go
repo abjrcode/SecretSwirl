@@ -49,7 +49,7 @@ func Build(appVersion, buildTimestamp, commitSha, buildLink string) error {
 
 		fmt.Println("Building DMG")
 		var amdDmgOutputPath = fmt.Sprintf("./build/bin/Swervo-amd64-%s.dmg", appVersion)
-		var createAmdDmgError = sh.RunV("create-dmg", "--no-internet-enable", "--hide-extension", "Swervo-amd64.app", "--app-drop-link", "600", "200", amdDmgOutputPath, "./build/bin/Swervo-amd64.app")
+		var createAmdDmgError = sh.RunV("create-dmg", "--window-size", "800", "300", "--no-internet-enable", "--hide-extension", "Swervo-amd64.app", "--app-drop-link", "600", "40", amdDmgOutputPath, "./build/bin/Swervo-amd64.app")
 
 		if createAmdDmgError != nil {
 			fmt.Println("Error building DMG", createAmdDmgError)
@@ -92,14 +92,30 @@ func Build(appVersion, buildTimestamp, commitSha, buildLink string) error {
 }
 
 func configureWailsProject(releaseVersion string) error {
-	var r, error = regexp.Compile("^v([^-]+)-(.+)$")
+	var nonTaggedReleaseVersion, error = regexp.Compile("^v(\\d+\\.\\d+\\.\\d+)-(.+)$")
 
 	if error != nil {
 		fmt.Println("Error compiling regex", error)
 		return error
 	}
 
-	var nsisCompliantVersion = r.ReplaceAllString(releaseVersion, "$1.$2")
+	var taggedReleaseVersion, error2 = regexp.Compile("^v(\\d+\\.\\d+\\.\\d+)$")
+
+	if error2 != nil {
+		fmt.Println("Error compiling regex", error2)
+		return error2
+	}
+
+	var nsisCompliantVersion = ""
+
+	if nonTaggedReleaseVersion.MatchString(releaseVersion) == true {
+		nsisCompliantVersion = nonTaggedReleaseVersion.ReplaceAllString(releaseVersion, "$1.$2")
+	} else if taggedReleaseVersion.MatchString(releaseVersion) == true {
+		nsisCompliantVersion = taggedReleaseVersion.ReplaceAllString(releaseVersion, "$1.0")
+	} else {
+		return fmt.Errorf("Invalid release version: %s. Expected semantic release in one of the following two formats: vX.X.X or vX.X.X-X-XXXXXXX", releaseVersion)
+	}
+
 	fmt.Printf("NSIS compatible version: [%s]\n", nsisCompliantVersion)
 
 	type WailsProjectConfigAuthor struct {
