@@ -40,7 +40,7 @@ func Build(appVersion, buildTimestamp, commitSha, buildLink string) error {
 		mg.Deps(mg.F(configureWailsProject, appVersion))
 
 		fmt.Println("Building Wails App for Darwin")
-		var buildDarwin = sh.RunV("wails", "build", "-m", "-nosyncgomod", "-ldflags", ldFlags, "-platform", "darwin/arm64,darwin/amd64")
+		var buildDarwin = sh.RunV("wails", "build", "-m", "-nosyncgomod", "-ldflags", ldFlags, "-platform", "darwin/universal")
 
 		if buildDarwin != nil {
 			fmt.Println("Error building Darwin Wails App", buildDarwin)
@@ -48,20 +48,12 @@ func Build(appVersion, buildTimestamp, commitSha, buildLink string) error {
 		}
 
 		fmt.Println("Building DMG")
-		var amdDmgOutputPath = fmt.Sprintf("./build/bin/swervo-darwin-amd64-%s.dmg", appVersion)
-		var createAmdDmgError = sh.RunV("create-dmg", "--window-size", "800", "300", "--no-internet-enable", "--hide-extension", "Swervo-amd64.app", "--app-drop-link", "600", "40", amdDmgOutputPath, "./build/bin/Swervo-amd64.app")
+		var dmgOutputPath = fmt.Sprintf("./build/bin/swervo-darwin-universal-%s.dmg", appVersion)
+		var createDmgError = sh.RunV("create-dmg", "--window-size", "800", "300", "--no-internet-enable", "--hide-extension", "Swervo.app", "--app-drop-link", "600", "40", dmgOutputPath, "./build/bin/Swervo.app")
 
-		if createAmdDmgError != nil {
-			fmt.Println("Error building DMG", createAmdDmgError)
-			return createAmdDmgError
-		}
-
-		var armDmgOutputPath = fmt.Sprintf("./build/bin/swervo-darwin-arm64-%s.dmg", appVersion)
-		var createArmDmgError = sh.RunV("create-dmg", "--window-size", "800", "300", "--no-internet-enable", "--hide-extension", "Swervo-arm64.app", "--app-drop-link", "600", "40", armDmgOutputPath, "./build/bin/Swervo-arm64.app")
-
-		if createArmDmgError != nil {
-			fmt.Println("Error building DMG", createArmDmgError)
-			return createArmDmgError
+		if createDmgError != nil {
+			fmt.Println("Error building DMG", createDmgError)
+			return createDmgError
 		}
 
 		fmt.Println("Compiling seticon.swift")
@@ -78,14 +70,7 @@ func Build(appVersion, buildTimestamp, commitSha, buildLink string) error {
 		}
 
 		fmt.Println("Setting DMG icons")
-		var setAmdIconError = sh.RunV("./seticon", "./build/bin/Swervo-amd64.app/Contents/Resources/iconfile.icns", amdDmgOutputPath)
-
-		if setAmdIconError != nil {
-			fmt.Println("Error setting AMD64 DMG icon", setAmdIconError)
-			return setAmdIconError
-		}
-
-		return sh.RunV("./seticon", "./build/bin/Swervo-arm64.app/Contents/Resources/iconfile.icns", armDmgOutputPath)
+		return sh.RunV("./seticon", "./build/bin/Swervo.app/Contents/Resources/iconfile.icns", dmgOutputPath)
 	} else {
 		return fmt.Errorf("Unsupported OS/architecture: %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
