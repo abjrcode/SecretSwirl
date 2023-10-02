@@ -48,7 +48,7 @@ func Build(appVersion, buildTimestamp, commitSha, buildLink string) error {
 		}
 
 		fmt.Println("Building DMG")
-		var amdDmgOutputPath = fmt.Sprintf("./build/bin/Swervo-amd64-%s.dmg", appVersion)
+		var amdDmgOutputPath = fmt.Sprintf("./build/bin/swervo-darwin-amd64-%s.dmg", appVersion)
 		var createAmdDmgError = sh.RunV("create-dmg", "--window-size", "800", "300", "--no-internet-enable", "--hide-extension", "Swervo-amd64.app", "--app-drop-link", "600", "40", amdDmgOutputPath, "./build/bin/Swervo-amd64.app")
 
 		if createAmdDmgError != nil {
@@ -56,7 +56,7 @@ func Build(appVersion, buildTimestamp, commitSha, buildLink string) error {
 			return createAmdDmgError
 		}
 
-		var armDmgOutputPath = fmt.Sprintf("./build/bin/Swervo-arm64-%s.dmg", appVersion)
+		var armDmgOutputPath = fmt.Sprintf("./build/bin/swervo-darwin-arm64-%s.dmg", appVersion)
 		var createArmDmgError = sh.RunV("create-dmg", "--window-size", "800", "300", "--no-internet-enable", "--hide-extension", "Swervo-arm64.app", "--app-drop-link", "600", "40", armDmgOutputPath, "./build/bin/Swervo-arm64.app")
 
 		if createArmDmgError != nil {

@@ -18,12 +18,10 @@ var CommitSha string = "HEAD"
 var BuildLink string = "http://localhost"
 
 func main() {
-	// Create an instance of the app structure
 	app := NewApp()
 
-	// Create application with options
 	err := wails.Run(&options.App{
-		Title:  fmt.Sprintf("Swervo - %s - %s - %s - %s", Version, BuildTimestamp, CommitSha, BuildLink),
+		Title:  fmt.Sprintf("Swervo - %s - %s - %s", Version, BuildTimestamp, CommitSha),
 		Width:  1024,
 		Height: 768,
 		AssetServer: &assetserver.Options{

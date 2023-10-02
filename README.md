@@ -4,7 +4,10 @@
 
 Rotate your secrets and live worry free!
 
-# Requirements
+> [!NOTE]  
+> When trying to run the MacOS `DMG` bundles, you might get a message that the binary is damaged. It is not. The browser or the OS is marking it for quarantine. You can make it work by running `xattr -r -d com.apple.quarantine ./<path to DMG file>`.
+
+# Development Requirements
 
 - [Golang 1.21.x](https://go.dev/dl/)
 - [NodeJS 18.x.x](https://nodejs.org/en/) Recommended to use [nvm](https://github.com/nvm-sh/nvm#installing-and-updating) or [windows-nvm](https://github.com/coreybutler/nvm-windows#installation--upgrades) to manage NodeJS versions.
@@ -27,7 +30,7 @@ wails build
 
 Then you can find the binary in `./build/bin/`
 
-## Live Development
+## Developing Locally
 
 To run in live development mode:
 
