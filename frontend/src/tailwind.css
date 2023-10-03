@@ -1,3 +1,20 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --color-primary: 229 231 235;
+    --color-secondary: 31 41 55;
+    --neutral: 255 255 255;
+    --accent: 255 255 255;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-primary: 31 41 55;
+      --color-secondary: 255 255 255;
+      --neutral: 255 255 255;
+      --accent: 255 255 255;
+    }
+  }
+}
