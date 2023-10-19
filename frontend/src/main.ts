@@ -1,13 +1,13 @@
 import "./tailwind.css"
-import Alpine from 'alpinejs'
+import Alpine from "alpinejs"
 
 window.Alpine = Alpine
 
-Alpine.store('htmlClass', () => {
+Alpine.store("htmlClass", () => {
   if (import.meta.env.DEV) {
-    return 'debug-screens'
+    return "debug-screens"
   }
-  return ''
+  return ""
 })
 
 Alpine.start()
