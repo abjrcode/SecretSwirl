@@ -15,62 +15,39 @@ import (
 
 func Build(appVersion, buildTimestamp, commitSha, buildLink string) error {
 	var ldFlags = fmt.Sprintf("-X 'main.Version=%s' -X 'main.BuildTimestamp=%s' -X 'main.CommitSha=%s' -X 'main.BuildLink=%s'", appVersion, buildTimestamp, commitSha, buildLink)
-	var ouputFilename = fmt.Sprintf("swervo-%s-%s-%s", runtime.GOOS, runtime.GOARCH, appVersion)
 
-	if runtime.GOOS == "linux" && runtime.GOARCH == "amd64" {
+	if runtime.GOOS == "linux" {
 		mg.Deps(mg.F(configureWailsProject, appVersion))
 
-		fmt.Println("Building Wails App")
+		if runtime.GOARCH == "amd64" {
+			if err := buildLinuxAMD64(ldFlags, appVersion, false); err != nil {
+				return fmt.Errorf("Error building Linux AMD64: %s", err)
+			}
 
-		var windowsOutputFilename = fmt.Sprintf("swervo-windows-amd64-%s.exe", appVersion)
-		var buildWindows = sh.RunV("wails", "build", "-m", "-nosyncgomod", "-ldflags", ldFlags, "-nsis", "-platform", "windows/amd64", "-o", windowsOutputFilename)
+			if err := buildLinuxARM64(ldFlags, appVersion, true); err != nil {
+				return fmt.Errorf("Error building Linux ARM64: %s", err)
+			}
+		} else {
+			if err := buildLinuxARM64(ldFlags, appVersion, false); err != nil {
+				return fmt.Errorf("Error building Linux ARM64: %s", err)
+			}
 
-		if buildWindows != nil {
-			fmt.Println("Error building Wails App for Windows", buildWindows)
-			return buildWindows
+			if err := buildLinuxAMD64(ldFlags, appVersion, true); err != nil {
+				return fmt.Errorf("Error building Linux AMD64: %s", err)
+			}
 		}
 
-		return sh.RunV("wails", "build", "-m", "-nosyncgomod", "-ldflags", ldFlags, "-platform", "linux/amd64", "-o", ouputFilename)
-	} else if runtime.GOOS == "windows" || (runtime.GOOS == "linux" && runtime.GOARCH == "arm64") {
-		mg.Deps(mg.F(configureWailsProject, appVersion))
+		var buildWindowsErr = buildWindowsAMD64(ldFlags, appVersion, true)
 
-		fmt.Println("Building Wails App")
-		return sh.RunV("wails", "build", "-m", "-nosyncgomod", "-ldflags", ldFlags, "-o", ouputFilename)
+		if buildWindowsErr != nil {
+			buildWindowsErr = fmt.Errorf("Error building Windows AMD64: %s", buildWindowsErr)
+		}
+
+		return buildWindowsErr
 	} else if runtime.GOOS == "darwin" {
 		mg.Deps(mg.F(configureWailsProject, appVersion))
 
-		fmt.Println("Building Wails App for Darwin")
-		var buildDarwin = sh.RunV("wails", "build", "-m", "-nosyncgomod", "-ldflags", ldFlags, "-platform", "darwin/universal")
-
-		if buildDarwin != nil {
-			fmt.Println("Error building Darwin Wails App", buildDarwin)
-			return buildDarwin
-		}
-
-		fmt.Println("Building DMG")
-		var dmgOutputPath = fmt.Sprintf("./build/bin/swervo-darwin-universal-%s.dmg", appVersion)
-		var createDmgError = sh.RunV("create-dmg", "--window-size", "800", "300", "--no-internet-enable", "--hide-extension", "Swervo.app", "--app-drop-link", "600", "40", dmgOutputPath, "./build/bin/Swervo.app")
-
-		if createDmgError != nil {
-			fmt.Println("Error building DMG", createDmgError)
-			return createDmgError
-		}
-
-		fmt.Println("Compiling seticon.swift")
-		var swiftcError = sh.Run("swiftc", "./build/darwin/seticon.swift")
-		if swiftcError != nil {
-			fmt.Println("Error compiling seticon.swift", swiftcError)
-			return swiftcError
-		}
-
-		var chmodError = sh.Run("chmod", "+x", "./seticon")
-		if chmodError != nil {
-			fmt.Println("Error setting permissions on seticon", chmodError)
-			return chmodError
-		}
-
-		fmt.Println("Setting DMG icons")
-		return sh.RunV("./seticon", "./build/bin/Swervo.app/Contents/Resources/iconfile.icns", dmgOutputPath)
+		return buildDarwinUniversal(ldFlags, appVersion)
 	} else {
 		return fmt.Errorf("Unsupported OS/architecture: %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
@@ -155,4 +132,76 @@ func configureWailsProject(releaseVersion string) error {
 
 	fmt.Println("Writing Wails Config")
 	return os.WriteFile("wails.json", updatedWailsConfig, os.ModePerm)
+}
+
+func buildLinuxAMD64(ldFlags, appVersion string, skipFrontend bool) error {
+	var outputFileName = fmt.Sprintf("swervo-linux-amd64-%s", appVersion)
+
+	skipBindingsFlag := ""
+	skipFrontendFlag := ""
+
+	if skipFrontend == true {
+		skipBindingsFlag = "-skipbindings"
+		skipFrontendFlag = "-s"
+	}
+
+	crossCompileFlags := map[string]string{"GOOS": "linux", "GOARCH": "amd64", "CC": "x86_64-linux-gnu-gcc", "CXX": "x86_64-linux-gnu-g++"}
+
+	return sh.RunWithV(crossCompileFlags, "wails", "build", "-m", "-nosyncgomod", "-ldflags", ldFlags, "-platform", "linux/amd64", "-o", outputFileName, skipBindingsFlag, skipFrontendFlag)
+}
+
+func buildLinuxARM64(ldFlags, appVersion string, skipFrontend bool) error {
+	var outputFileName = fmt.Sprintf("swervo-linux-arm64-%s", appVersion)
+
+	skipBindingsFlag := ""
+	skipFrontendFlag := ""
+
+	if skipFrontend == true {
+		skipBindingsFlag = "-skipbindings"
+		skipFrontendFlag = "-s"
+	}
+
+	crossCompileFlags := map[string]string{"GOOS": "linux", "GOARCH": "arm64", "CC": "aarch64-linux-gnu-gcc", "CXX": "aarch64-linux-gnu-g++"}
+
+	return sh.RunWithV(crossCompileFlags, "wails", "build", "-m", "-nosyncgomod", "-ldflags", ldFlags, "-platform", "linux/arm64", "-o", outputFileName, skipBindingsFlag, skipFrontendFlag)
+}
+
+func buildWindowsAMD64(ldFlags, appVersion string, skipFrontend bool) error {
+	var outputFileName = fmt.Sprintf("swervo-windows-amd64-%s.exe", appVersion)
+
+	skipBindingsFlag := ""
+	skipFrontendFlag := ""
+
+	if skipFrontend == true {
+		skipBindingsFlag = "-skipbindings"
+		skipFrontendFlag = "-s"
+	}
+
+	crossCompileFlags := map[string]string{"GOOS": "windows", "GOARCH": "amd64", "CC": "x86_64-w64-mingw32-gcc", "CXX": "x86_64-w64-mingw32-g++"}
+
+	return sh.RunWithV(crossCompileFlags, "wails", "build", "-m", "-nosyncgomod", "-ldflags", ldFlags, "-nsis", "-platform", "windows/amd64", "-o", outputFileName, skipBindingsFlag, skipFrontendFlag)
+}
+
+func buildDarwinUniversal(ldFlags, appVersion string) error {
+	if err := sh.RunV("wails", "build", "-m", "-nosyncgomod", "-ldflags", ldFlags, "-platform", "darwin/universal"); err != nil {
+		return fmt.Errorf("Error building Darwin Wails App: %s", err)
+	}
+
+	fmt.Println("Building DMG")
+	var dmgOutputPath = fmt.Sprintf("./build/bin/swervo-darwin-universal-%s.dmg", appVersion)
+	if err := sh.RunV("create-dmg", "--window-size", "800", "300", "--no-internet-enable", "--hide-extension", "Swervo.app", "--app-drop-link", "600", "40", dmgOutputPath, "./build/bin/Swervo.app"); err != nil {
+		return fmt.Errorf("Error building DMG: %s", err)
+	}
+
+	fmt.Println("Compiling seticon.swift")
+	if err := sh.Run("swiftc", "./build/darwin/seticon.swift"); err != nil {
+		return fmt.Errorf("Error compiling seticon with Swift: %s", err)
+	}
+
+	if err := sh.Run("chmod", "+x", "./seticon"); err != nil {
+		return fmt.Errorf("Error setting permissions on seticon: %s", err)
+	}
+
+	fmt.Println("Setting DMG icons")
+	return sh.RunV("./seticon", "./build/bin/Swervo.app/Contents/Resources/iconfile.icns", dmgOutputPath)
 }
