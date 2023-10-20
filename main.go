@@ -43,7 +43,19 @@ func (myLogger *MyLogger) Verbose() bool {
 	return true
 }
 
+func isWailsRunningAppToGenerateBindings(osArgs []string) bool {
+	for _, arg := range osArgs {
+		if strings.HasSuffix(arg, "wailsbindings") {
+			return true
+		}
+	}
+
+	return false
+}
+
 func main() {
+	generateBindingsRun := isWailsRunningAppToGenerateBindings(os.Args)
+
 	app := NewApp()
 
 	AppMenu := menu.NewMenu()
@@ -65,40 +77,42 @@ func main() {
 		})
 	})
 
-	var appDataDir string
+	if !generateBindingsRun {
+		var appDataDir string
 
-	if userHomeDir, err := os.UserHomeDir(); err != nil {
-		log.Fatal(err)
-	} else {
-		appDataDir = userHomeDir
-	}
-
-	appStorageDir := filepath.Join(appDataDir, "swervo")
-
-	// appConfigFile := filepath.Join(appStorageDir, "swervo.toml")
-	appDbFile := filepath.Join(appStorageDir, "swervo.db")
-
-	if _, err := os.Stat(appStorageDir); os.IsNotExist(err) {
-		errDir := os.MkdirAll(appStorageDir, 0700)
-
-		if errDir != nil {
-			log.Fatal(errDir)
-		}
-	}
-
-	migrationsSrc, err := iofs.New(migrationSqlAssets, "db/migrations")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	dbConnectionString := fmt.Sprintf("sqlite3://%s", strings.ReplaceAll(appDbFile, "\\", "/"))
-
-	if m, err := migrate.NewWithSourceInstance("iofs", migrationsSrc, dbConnectionString); err != nil {
-		log.Fatal(err)
-	} else {
-		log.Println("Running migrations against database: ", appDbFile)
-		if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		if userHomeDir, err := os.UserHomeDir(); err != nil {
 			log.Fatal(err)
+		} else {
+			appDataDir = userHomeDir
+		}
+
+		appStorageDir := filepath.Join(appDataDir, "swervo")
+
+		// appConfigFile := filepath.Join(appStorageDir, "swervo.toml")
+		appDbFile := filepath.Join(appStorageDir, "swervo.db")
+
+		if _, err := os.Stat(appStorageDir); os.IsNotExist(err) {
+			errDir := os.MkdirAll(appStorageDir, 0700)
+
+			if errDir != nil {
+				log.Fatal(errDir)
+			}
+		}
+
+		migrationsSrc, err := iofs.New(migrationSqlAssets, "db/migrations")
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		dbConnectionString := fmt.Sprintf("sqlite3://%s", strings.ReplaceAll(appDbFile, "\\", "/"))
+
+		if m, err := migrate.NewWithSourceInstance("iofs", migrationsSrc, dbConnectionString); err != nil {
+			log.Fatal(err)
+		} else {
+			log.Printf("Running migrations against database [%s]\n", appDbFile)
+			if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+				log.Fatal(err)
+			}
 		}
 	}
 
