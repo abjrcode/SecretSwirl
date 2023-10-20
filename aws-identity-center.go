@@ -2,17 +2,17 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ssooidc"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/rs/zerolog"
 )
 
 type AwsIdentityCenterController struct {
 	ctx     context.Context
+	logger  *zerolog.Logger
 	appData *AppData
 }
 
@@ -22,17 +22,18 @@ func NewAwsIdentityCenterController(appData *AppData) *AwsIdentityCenterControll
 	}
 }
 
-func (awsIdcController *AwsIdentityCenterController) startup(ctx context.Context) {
-	awsIdcController.ctx = ctx
+func (controller *AwsIdentityCenterController) startup(ctx context.Context) {
+	controller.ctx = ctx
+	controller.logger = zerolog.Ctx(ctx)
 }
 
-func (awdIdcController *AwsIdentityCenterController) RegisterClient(friendlyName string) error {
-	if awdIdcController.appData.AwsIdc.ClientId != "" {
+func (controller *AwsIdentityCenterController) RegisterClient(friendlyName string) error {
+	if controller.appData.AwsIdc.ClientId != "" {
 		return nil
 	}
 
 	session := session.Must(session.NewSession())
-	runtime.LogInfo(awdIdcController.ctx, "Creating SSO OIDC client")
+	controller.logger.Info().Msg("Creating SSO OIDC client")
 	client := ssooidc.New(session, &aws.Config{Region: aws.String("eu-central-1")})
 
 	output, err := client.RegisterClient(&ssooidc.RegisterClientInput{
@@ -44,22 +45,22 @@ func (awdIdcController *AwsIdentityCenterController) RegisterClient(friendlyName
 		return err
 	}
 
-	awdIdcController.appData.AwsIdc.ClientId = *output.ClientId
-	awdIdcController.appData.AwsIdc.ClientSecret = *output.ClientSecret
-	awdIdcController.appData.AwsIdc.ClientIdIssuedAt = *output.ClientIdIssuedAt
-	awdIdcController.appData.AwsIdc.ExpiresAt = *output.ClientSecretExpiresAt
+	controller.appData.AwsIdc.ClientId = *output.ClientId
+	controller.appData.AwsIdc.ClientSecret = *output.ClientSecret
+	controller.appData.AwsIdc.ClientIdIssuedAt = *output.ClientIdIssuedAt
+	controller.appData.AwsIdc.ExpiresAt = *output.ClientSecretExpiresAt
 
 	return nil
 }
 
-func (awdIdcController *AwsIdentityCenterController) AuthorizeDevice() error {
+func (controller *AwsIdentityCenterController) AuthorizeDevice() error {
 	session := session.Must(session.NewSession())
-	runtime.LogInfo(awdIdcController.ctx, "Authorizing Device")
+	controller.logger.Info().Msg("Authorizing Device")
 	client := ssooidc.New(session, &aws.Config{Region: aws.String("eu-central-1")})
 
 	output, err := client.StartDeviceAuthorization(&ssooidc.StartDeviceAuthorizationInput{
-		ClientId:     aws.String(awdIdcController.appData.AwsIdc.ClientId),
-		ClientSecret: aws.String(awdIdcController.appData.AwsIdc.ClientSecret),
+		ClientId:     aws.String(controller.appData.AwsIdc.ClientId),
+		ClientSecret: aws.String(controller.appData.AwsIdc.ClientSecret),
 		StartUrl:     aws.String("https://d-99670c0d3d.awsapps.com/start"),
 	})
 
@@ -67,36 +68,35 @@ func (awdIdcController *AwsIdentityCenterController) AuthorizeDevice() error {
 		return err
 	}
 
-	awdIdcController.appData.AwsIdc.DeviceCode = *output.DeviceCode
+	controller.appData.AwsIdc.DeviceCode = *output.DeviceCode
 
-	runtime.LogInfo(awdIdcController.ctx,
-		fmt.Sprintf("Please visit %s and enter code %s", *output.VerificationUri, *output.UserCode))
+	controller.logger.Info().Msgf("Please visit %s and enter code %s", *output.VerificationUri, *output.UserCode)
 
 	return nil
 }
 
-func (awdIdcController *AwsIdentityCenterController) CreateToken() error {
+func (controller *AwsIdentityCenterController) CreateToken() error {
 	session := session.Must(session.NewSession())
-	runtime.LogInfo(awdIdcController.ctx, "Creating Token")
+	controller.logger.Info().Msg("Creating Token")
 	client := ssooidc.New(session, &aws.Config{Region: aws.String("eu-central-1")})
 
 	output, err := client.CreateToken(&ssooidc.CreateTokenInput{
-		ClientId:     aws.String(awdIdcController.appData.AwsIdc.ClientId),
-		ClientSecret: aws.String(awdIdcController.appData.AwsIdc.ClientSecret),
+		ClientId:     aws.String(controller.appData.AwsIdc.ClientId),
+		ClientSecret: aws.String(controller.appData.AwsIdc.ClientSecret),
 		GrantType:    aws.String("urn:ietf:params:oauth:grant-type:device_code"),
-		DeviceCode:   aws.String(awdIdcController.appData.AwsIdc.DeviceCode),
+		DeviceCode:   aws.String(controller.appData.AwsIdc.DeviceCode),
 	})
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	awdIdcController.appData.AwsIdc.AccessToken = *output.AccessToken
-	awdIdcController.appData.AwsIdc.AccessTokenExpiresInSeconds = *output.ExpiresIn
+	controller.appData.AwsIdc.AccessToken = *output.AccessToken
+	controller.appData.AwsIdc.AccessTokenExpiresInSeconds = *output.ExpiresIn
 	//awdIdcController.appData.AwsIdc.RefreshToken = *output.RefreshToken
-	awdIdcController.appData.AwsIdc.TokenType = *output.TokenType
+	controller.appData.AwsIdc.TokenType = *output.TokenType
 
-	runtime.LogInfo(awdIdcController.ctx, fmt.Sprintf("Access Token: %s", *output.AccessToken))
+	controller.logger.Info().Msgf("Access Token: %s", *output.AccessToken)
 
 	return nil
 }

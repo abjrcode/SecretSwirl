@@ -3,6 +3,10 @@ name: Linux Build
 on:
   workflow_call:
     inputs:
+      BUILD_TYPE:
+        type: string
+        description: "Build type: release or debug"
+        required: true
       GO_VERSION:
         type: string
         description: "Full Go version to use, e.g. 1.21.1"
@@ -74,6 +78,7 @@ jobs:
             GO_VERSION=${{ inputs.GO_VERSION }}
             WAILS_VERSION=${{ inputs.WAILS_VERSION }}
             NODE_MAJOR_VERSION=${{ inputs.NODE_VERSION }}
+            BUILD_TYPE=${{ inputs.BUILD_TYPE }}
             RELEASE_TAG=${{ env.RELEASE_TAG }}
             BUILD_TIMESTAMP=${{ steps.generateBuildTimestamp.outputs.BUILD_TIMESTAMP }}
             COMMIT_SHA=${{ github.sha }}

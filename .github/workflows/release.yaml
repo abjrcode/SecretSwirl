@@ -21,6 +21,7 @@ jobs:
       GO_VERSION: "v1.21.1"
       NODE_VERSION: "18"
       WAILS_VERSION: "v2.6.0"
+      BUILD_TYPE: "release"
 
   DarwinCI:
     uses: ./.github/workflows/build-darwin.yaml
@@ -29,6 +30,7 @@ jobs:
       GO_VERSION: "v1.21.1"
       NODE_VERSION: "18"
       WAILS_VERSION: "v2.6.0"
+      BUILD_TYPE: "release"
 
   Publish:
     runs-on: ubuntu-latest
