@@ -13,8 +13,12 @@ import (
 	"github.com/magefile/mage/sh"
 )
 
-func Build(appVersion, buildTimestamp, commitSha, buildLink string) error {
-	var ldFlags = fmt.Sprintf("-X 'main.Version=%s' -X 'main.BuildTimestamp=%s' -X 'main.CommitSha=%s' -X 'main.BuildLink=%s'", appVersion, buildTimestamp, commitSha, buildLink)
+func Build(buildType, appVersion, buildTimestamp, commitSha, buildLink string) error {
+	if buildType != "release" && buildType != "debug" {
+		return fmt.Errorf("Invalid build type: %s. Expected either \"release\" or \"debug\"", buildType)
+	}
+
+	var ldFlags = fmt.Sprintf("-X 'main.BuildType=%s' -X 'main.Version=%s' -X 'main.BuildTimestamp=%s' -X 'main.CommitSha=%s' -X 'main.BuildLink=%s'", buildType, appVersion, buildTimestamp, commitSha, buildLink)
 
 	if runtime.GOOS == "linux" {
 		mg.Deps(mg.F(configureWailsProject, appVersion))
