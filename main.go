@@ -1,10 +1,19 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"fmt"
+	"log"
+	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/sqlite3"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/menu"
 	"github.com/wailsapp/wails/v2/pkg/menu/keys"
@@ -16,10 +25,23 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+//go:embed db/migrations
+var migrationSqlAssets embed.FS
+
 var Version string = "v0.0.0"
 var BuildTimestamp string = "NOW"
 var CommitSha string = "HEAD"
 var BuildLink string = "http://localhost"
+
+type MyLogger struct{}
+
+func (myLogger *MyLogger) Printf(format string, v ...interface{}) {
+	fmt.Printf(format, v...)
+}
+
+func (myLogger *MyLogger) Verbose() bool {
+	return true
+}
 
 func main() {
 	app := NewApp()
@@ -43,7 +65,53 @@ func main() {
 		})
 	})
 
-	err := wails.Run(&options.App{
+	var appDataDir string
+
+	if userHomeDir, err := os.UserHomeDir(); err != nil {
+		log.Fatal(err)
+	} else {
+		appDataDir = userHomeDir
+	}
+
+	appStorageDir := filepath.Join(appDataDir, "swervo")
+
+	// appConfigFile := filepath.Join(appStorageDir, "swervo.toml")
+	appDbFile := filepath.Join(appStorageDir, "swervo.db")
+
+	if _, err := os.Stat(appStorageDir); os.IsNotExist(err) {
+		errDir := os.MkdirAll(appStorageDir, 0700)
+
+		if errDir != nil {
+			log.Fatal(errDir)
+		}
+	}
+
+	migrationsSrc, err := iofs.New(migrationSqlAssets, "db/migrations")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	dbConnectionString := fmt.Sprintf("sqlite3://%s", strings.ReplaceAll(appDbFile, "\\", "/"))
+
+	if m, err := migrate.NewWithSourceInstance("iofs", migrationsSrc, dbConnectionString); err != nil {
+		log.Fatal(err)
+	} else {
+		log.Println("Running migrations against database: ", appDbFile)
+		if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+			log.Fatal(err)
+		}
+	}
+
+	var appdata AppData
+
+	awsIdcc := NewAwsIdentityCenterController(&appdata)
+
+	var onStartup = func(ctx context.Context) {
+		app.startup(ctx)
+		awsIdcc.startup(ctx)
+	}
+
+	if err := wails.Run(&options.App{
 		Title:  "Swervo",
 		Width:  1024,
 		Height: 768,
@@ -51,13 +119,12 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		OnStartup: app.startup,
+		OnStartup: onStartup,
 		Bind: []interface{}{
 			app,
+			awsIdcc,
 		},
-	})
-
-	if err != nil {
+	}); err != nil {
 		println("Error:", err.Error())
 	}
 }

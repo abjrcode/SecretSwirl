@@ -76,6 +76,7 @@ jobs:
           BUILD_TIMESTAMP: ${{ steps.generateBuildTimestamp.outputs.BUILD_TIMESTAMP }}
           COMMIT_SHA: ${{ github.sha }}
           BUILD_LINK: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          CGO_ENABLED: 1
         run: |
           go run mage.go build $RELEASE_TAG $BUILD_TIMESTAMP $COMMIT_SHA $BUILD_LINK
 
