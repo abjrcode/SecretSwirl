@@ -4,17 +4,20 @@
 
 @layer base {
   :root {
-    --color-primary: 229 231 235;
-    --color-secondary: 31 41 55;
-    --neutral: 255 255 255;
-    --accent: 255 255 255;
+    --color-fill: toRgb(theme(colors.white));
+    --color-text: toRgb(theme(colors.yellow.700));
+    --color-button-fill: toRgb(theme(colors.yellow.300));
+    --color-button-text: toRgb(theme(colors.yellow.700));
+    --color-button-border: toRgb(theme(colors.yellow.700));
+    --color-card-fill: toRgb(theme(colors.yellow.100));
+    --color-card-border: toRgb(theme(colors.yellow.700));
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --color-primary: 31 41 55;
-      --color-secondary: 255 255 255;
-      --neutral: 255 255 255;
-      --accent: 255 255 255;
+      --color-fill: toRgb(theme(colors.black));
+      --color-text: toRgb(theme(colors.yellow.200));
+      --color-card-fill: toRgb(theme(colors.yellow.700));
+      --color-card-border: toRgb(theme(colors.yellow.200));
     }
   }
 }
