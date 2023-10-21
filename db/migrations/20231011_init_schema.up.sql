@@ -1,3 +1,3 @@
-CREATE TABLE IF NOT EXISTS DOGS (
+CREATE TABLE IF NOT EXISTS providers (
   name string
 );
