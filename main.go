@@ -97,8 +97,8 @@ func main() {
 			Assets: assets,
 		},
 		OnStartup: func(ctx context.Context) {
-			appController.init(logger.WithContext(ctx))
-			awsIdcController.startup(logger.WithContext(ctx))
+			appController.Init(logger.WithContext(ctx))
+			awsIdcController.Init(logger.WithContext(ctx))
 		},
 		Bind: []interface{}{
 			appController,

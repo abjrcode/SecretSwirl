@@ -85,6 +85,10 @@ jobs:
         run: |
           go run mage.go build $BUILD_TYPE $RELEASE_TAG $BUILD_TIMESTAMP $COMMIT_SHA $BUILD_LINK
 
+      - name: Run Go Tests
+        run: |
+          go test -v ./...
+
       - name: Upload Build Arifacts
         uses: actions/upload-artifact@v3
         with:

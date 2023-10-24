@@ -22,7 +22,7 @@ func NewAwsIdentityCenterController(appData *AppData) *AwsIdentityCenterControll
 	}
 }
 
-func (controller *AwsIdentityCenterController) startup(ctx context.Context) {
+func (controller *AwsIdentityCenterController) Init(ctx context.Context) {
 	controller.ctx = ctx
 	controller.logger = zerolog.Ctx(ctx)
 }
