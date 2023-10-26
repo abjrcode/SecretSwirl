@@ -18,9 +18,7 @@ jobs:
       packages: write
 
     with:
-      GO_VERSION: "v1.21.1"
-      NODE_VERSION: "18"
-      WAILS_VERSION: "v2.6.0"
+      BASE_IMAGE: ghcr.io/abjrcode/cross-wails:v2.6.0
       BUILD_TYPE: "release"
 
   DarwinCI:
