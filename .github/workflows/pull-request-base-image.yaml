@@ -1,4 +1,4 @@
-name: Pull Request
+name: Pull Request Base Image
 
 on:
   pull_request:
@@ -9,35 +9,26 @@ on:
       - ready_for_review
     branches:
       - main
-    paths-ignore:
+    paths:
       - "Dependencies.Dockerfile"
   workflow_dispatch:
 
 concurrency:
-  group: swervo-pr-ci-${{ github.ref }}
+  group: swervo-base-pr-ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  LinuxCI:
+  BaseImage:
     if: ${{ !github.event.pull_request.draft }}
 
-    uses: ./.github/workflows/build-linux.yaml
+    uses: ./.github/workflows/build-base-image.yaml
 
     permissions:
       contents: read
       packages: write
 
     with:
-      BASE_IMAGE: "ghcr.io/abjrcode/swervo/base:latest"
-      BUILD_TYPE: "debug"
-
-  DarwinCI:
-    if: ${{ !github.event.pull_request.draft }}
-
-    uses: ./.github/workflows/build-darwin.yaml
-
-    with:
-      GO_VERSION: "1.21.1"
+      GO_VERSION: "v1.21.1"
       NODE_VERSION: "18"
       WAILS_VERSION: "v2.6.0"
-      BUILD_TYPE: "debug"
+      PUSH_IMAGE: true

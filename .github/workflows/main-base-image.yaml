@@ -1,34 +1,27 @@
-name: Main
+name: Main Base Image
 
 on:
   push:
     branches:
       - main
-    paths-ignore:
+    paths:
       - "Dependencies.Dockerfile"
   workflow_dispatch:
 
 concurrency:
-  group: swervo-main
+  group: swervo-main-base
   cancel-in-progress: true
 
 jobs:
-  LinuxCI:
-    uses: ./.github/workflows/build-linux.yaml
+  BaseImage:
+    uses: ./.github/workflows/build-base-image.yaml
 
     permissions:
       contents: read
       packages: write
 
     with:
-      BASE_IMAGE: "ghcr.io/abjrcode/swervo/base:latest"
-      BUILD_TYPE: "release"
-
-  DarwinCI:
-    uses: ./.github/workflows/build-darwin.yaml
-
-    with:
       GO_VERSION: "v1.21.1"
       NODE_VERSION: "18"
       WAILS_VERSION: "v2.6.0"
-      BUILD_TYPE: "release"
+      PUSH_IMAGE: true

@@ -3,21 +3,13 @@ name: Linux Build
 on:
   workflow_call:
     inputs:
+      BASE_IMAGE:
+        type: string
+        description: "Base image to use for build"
+        required: true
       BUILD_TYPE:
         type: string
         description: "Build type: release or debug"
-        required: true
-      GO_VERSION:
-        type: string
-        description: "Full Go version to use, e.g. 1.21.1"
-        required: true
-      NODE_VERSION:
-        type: string
-        description: "Node version to use, e.g. 18, 20 etc"
-        required: true
-      WAILS_VERSION:
-        type: string
-        description: "Wails version to use, e.g. v2.6.0"
         required: true
     outputs:
       ReleaseTag:
@@ -75,9 +67,7 @@ jobs:
             type=registry,ref=ghcr.io/abjrcode/swervo/cache
           cache-to: type=registry,ref=ghcr.io/abjrcode/swervo/cache,mode=max
           build-args: |
-            GO_VERSION=${{ inputs.GO_VERSION }}
-            WAILS_VERSION=${{ inputs.WAILS_VERSION }}
-            NODE_MAJOR_VERSION=${{ inputs.NODE_VERSION }}
+            BASE_IMAGE=${{ inputs.BASE_IMAGE }}
             BUILD_TYPE=${{ inputs.BUILD_TYPE }}
             RELEASE_TAG=${{ env.RELEASE_TAG }}
             BUILD_TIMESTAMP=${{ steps.generateBuildTimestamp.outputs.BUILD_TIMESTAMP }}
