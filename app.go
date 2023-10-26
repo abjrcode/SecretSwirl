@@ -44,7 +44,7 @@ func NewAppController() *AppController {
 	return controller
 }
 
-func (app *AppController) init(ctx context.Context) {
+func (app *AppController) Init(ctx context.Context) {
 	app.ctx = ctx
 	app.logger = zerolog.Ctx(ctx)
 }

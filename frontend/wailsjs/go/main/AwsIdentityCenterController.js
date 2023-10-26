@@ -10,6 +10,10 @@ export function CreateToken() {
   return window['go']['main']['AwsIdentityCenterController']['CreateToken']();
 }
 
+export function Init(arg1) {
+  return window['go']['main']['AwsIdentityCenterController']['Init'](arg1);
+}
+
 export function RegisterClient(arg1) {
   return window['go']['main']['AwsIdentityCenterController']['RegisterClient'](arg1);
 }
