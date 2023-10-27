@@ -71,7 +71,7 @@ jobs:
       - name: Cache Node Modules
         uses: actions/cache@v3
         with:
-          key: node_modules-${{ hashFiles('./frontend/package-lock.json') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-node_modules-${{ hashFiles('./frontend/package-lock.json') }}
           path: "./frontend/node_modules"
 
       - name: Build Wails Application
