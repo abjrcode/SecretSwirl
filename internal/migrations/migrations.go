@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"database/sql"
+	"embed"
 	"errors"
 	"io/fs"
 	"os"
@@ -13,6 +14,9 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/rs/zerolog"
 )
+
+//go:embed scripts
+var DefaultMigrationsFs embed.FS
 
 type MigrationRunner struct {
 	migrationSource *source.Driver
