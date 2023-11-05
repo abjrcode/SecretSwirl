@@ -215,14 +215,17 @@ func (c *AwsIdentityCenterController) Setup(startUrlStr, awsRegion string) (stri
 }
 
 func (c *AwsIdentityCenterController) FinalizeSetup(timeoutSec uint8) error {
+	c.logger.Debug().Msgf("attempting to finalize setup with a timeout of [%d] seconds", timeoutSec)
 	select {
 	case c.syncChan <- true:
 		{
+			c.logger.Debug().Msg("sync signal sent")
 			select {
-			case <-time.After(5 * time.Second):
+			case <-time.After(time.Duration(timeoutSec) * time.Second):
 				return errors.New("timeout waiting for user to login")
 			case err := <-c.errChan:
 				{
+					c.logger.Warn().Msgf("finalizing setup failed with: %s", err)
 					if err != nil {
 						return err
 					}
@@ -230,6 +233,8 @@ func (c *AwsIdentityCenterController) FinalizeSetup(timeoutSec uint8) error {
 			}
 		}
 	case <-time.After(time.Duration(timeoutSec) * time.Second):
+		c.logger.Debug().Msg("timed out waiting for sync signal")
+		close(c.syncChan)
 		c.syncChan = make(chan bool)
 		return errors.New("timeout waiting for receiver to finish")
 	}

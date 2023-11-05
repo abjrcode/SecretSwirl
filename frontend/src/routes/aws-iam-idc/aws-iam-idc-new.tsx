@@ -25,7 +25,7 @@ export function AwsIamIdcNew() {
         </button>
         <button
           type="reset"
-          onClick={() => navigate("/dashboard")}
+          onClick={() => navigate("/")}
           className="btn btn-secondary">
           Abort
         </button>
