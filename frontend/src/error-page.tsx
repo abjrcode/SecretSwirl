@@ -6,7 +6,7 @@ export function ErrorPage() {
 
   if (isRouteErrorResponse(error)) {
     return (
-      <>
+      <div className="h-screen flex flex-col gap-4 items-center justify-center">
         <div>
           <h1>Oops!</h1>
           <h2>{error.status}</h2>
@@ -14,22 +14,24 @@ export function ErrorPage() {
           {error.data?.message && <p>{error.data.message}</p>}
         </div>
         <Link
-          to="/dashboard"
+          to="/"
+          reloadDocument
           className="link link-primary">
           Go Home
         </Link>
-      </>
+      </div>
     )
   } else {
     return (
-      <>
+      <div className="h-screen flex flex-col gap-4 items-center justify-center">
         <div>Oops</div>
         <Link
-          to="/dashboard"
+          to="/"
+          reloadDocument
           className="link link-primary">
           Go Home
         </Link>
-      </>
+      </div>
     )
   }
 }

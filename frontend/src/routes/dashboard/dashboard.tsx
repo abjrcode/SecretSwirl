@@ -1,4 +1,4 @@
-import { Form, Link, useLoaderData } from "react-router-dom"
+import { Link, useLoaderData } from "react-router-dom"
 import { AwsIamIdcCard } from "../aws-iam-idc/aws-iam-idc-card"
 import { main } from "../../../wailsjs/go/models"
 
@@ -30,11 +30,6 @@ export function Dashboard() {
           New
         </Link>
       </div>
-      <Form method="post">
-        <button className="fixed top-5 right-5 btn btn-secondary btn-outline">
-          lock
-        </button>
-      </Form>
     </>
   )
 }
