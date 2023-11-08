@@ -9,7 +9,7 @@ export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
     if (fetcher.state === "idle" && !fetcher.data) {
       const urlSearchParams = new URLSearchParams()
       urlSearchParams.append("instanceId", instanceId)
-      fetcher.load(`/aws-iam-idc-card?${urlSearchParams.toString()}`)
+      fetcher.load(`/internal/api/aws-iam-idc-card?${urlSearchParams.toString()}`)
     }
   }, [instanceId, fetcher])
 
