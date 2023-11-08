@@ -16,5 +16,5 @@ export async function awsIamIdcNewConfigureAction({ request }: ActionFunctionArg
 
   await FinalizeSetup(3)
 
-  return redirect("/dashboard")
+  return redirect("/")
 }
