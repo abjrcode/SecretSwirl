@@ -74,12 +74,12 @@ func generateRandomBytes(n uint32) ([]byte, error) {
 }
 
 func comparePasswordAndHash(password string, salt, hash []byte, p *ArgonParameters) (bool, []byte, error) {
-	otherHash := argon2.IDKey([]byte(password), salt, p.Iterations, p.Memory, p.Parallelism, p.KeyLength)
+	derivedKey := argon2.IDKey([]byte(password), salt, p.Iterations, p.Memory, p.Parallelism, p.KeyLength)
 
-	otherHash = sha256Hash(otherHash)
+	derivedKeyHash := sha256Hash(derivedKey)
 
-	if subtle.ConstantTimeCompare(hash, otherHash) == 1 {
-		return true, otherHash, nil
+	if subtle.ConstantTimeCompare(hash, derivedKeyHash) == 1 {
+		return true, derivedKey, nil
 	}
 	return false, nil, nil
 }
