@@ -2,32 +2,51 @@ package vault
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"database/sql"
 	"encoding/base64"
 	"errors"
+	"io"
 
+	"github.com/abjrcode/swervo/internal/security/encryption"
 	"github.com/abjrcode/swervo/internal/utils"
 	"github.com/awnumar/memguard"
 )
 
 var (
-	ErrVaultAlreadyConfigured = errors.New("vault is already configured")
-	ErrVaultNotConfigured     = errors.New("vault is not configured")
+	ErrVaultAlreadyConfigured     = errors.New("vault is already configured")
+	ErrVaultNotConfigured         = errors.New("vault is not configured")
+	ErrVaultNotConfiguredOrSealed = errors.New("vault is not configured or sealed")
 )
 
 type Vault interface {
+	// IsSetup returns true if the vault is configured with a key, false otherwise.
 	IsSetup(ctx context.Context) (bool, error)
+
+	// ConfigureKey configures the vault with a key derived from the given plainPassword.
 	ConfigureKey(ctx context.Context, plainPassword string) error
+
+	// Open opens the vault with the given plainPassword.
+	// Allows the vault to be used for encryption and decryption.
 	Open(ctx context.Context, plainPassword string) (bool, error)
+
+	// Seal closes the vault and purges the key from memory.
 	Seal()
+
+	// Close closes the vault and purges the key from memory.
+	// Typically used when the vault is no longer needed and the application is shutting down.
 	Close()
-	Encrypt(ctx context.Context, plaintext []byte) ([]byte, error)
-	Decrypt(ctx context.Context, ciphertext []byte) ([]byte, error)
+
+	// Vault can be used as an encryption service.
+	encryption.EncryptionService
 }
 
 type vaultImpl struct {
 	timeSvc       utils.Datetime
 	db            *sql.DB
+	keyId         *string
 	encryptionKey *memguard.Enclave
 }
 
@@ -117,6 +136,7 @@ func (v *vaultImpl) ConfigureKey(ctx context.Context, plainPassword string) erro
 		return err
 	}
 
+	v.keyId = &keyId
 	v.encryptionKey = memguard.NewEnclave(derivedKey)
 
 	return nil
@@ -129,6 +149,7 @@ func (v *vaultImpl) Open(ctx context.Context, plainPassword string) (bool, error
 
 	row := v.db.QueryRowContext(ctx, `
 	SELECT
+		"key_id",
 		"key_hash_sha256",
 		"argon2_version",
 		"argon2_variant",
@@ -140,11 +161,12 @@ func (v *vaultImpl) Open(ctx context.Context, plainPassword string) (bool, error
 		"key_length"
 	FROM "argon_key_material";`)
 
+	var keyId string
 	var keyHash string
 	var saltBase64 string
 	var params ArgonParameters
 
-	err := row.Scan(&keyHash, &params.Aargon2Version, &params.Variant, &params.Memory,
+	err := row.Scan(&keyId, &keyHash, &params.Aargon2Version, &params.Variant, &params.Memory,
 		&params.Iterations, &params.Parallelism, &params.SaltLength, &saltBase64, &params.KeyLength)
 
 	if err != nil {
@@ -164,6 +186,7 @@ func (v *vaultImpl) Open(ctx context.Context, plainPassword string) (bool, error
 	}
 
 	if match {
+		v.keyId = &keyId
 		v.encryptionKey = memguard.NewEnclave(derivedKey)
 	}
 
@@ -171,6 +194,7 @@ func (v *vaultImpl) Open(ctx context.Context, plainPassword string) (bool, error
 }
 
 func (v *vaultImpl) Seal() {
+	v.keyId = nil
 	v.encryptionKey = nil
 	memguard.Purge()
 }
@@ -179,10 +203,96 @@ func (v *vaultImpl) Close() {
 	defer memguard.Purge()
 }
 
-func (v *vaultImpl) Encrypt(ctx context.Context, plaintext []byte) ([]byte, error) {
-	return nil, nil
+func (v *vaultImpl) EncryptBinary(plaintext []byte) ([]byte, string, error) {
+	if v.encryptionKey == nil {
+		return nil, "", ErrVaultNotConfiguredOrSealed
+	}
+
+	key, err := v.encryptionKey.Open()
+	if err != nil {
+		return nil, "", err
+	}
+	defer key.Destroy()
+
+	aesBlock, err := aes.NewCipher(key.Bytes())
+	if err != nil {
+		return nil, "", err
+	}
+
+	gcmInstance, err := cipher.NewGCM(aesBlock)
+	if err != nil {
+		return nil, "", err
+	}
+
+	nonce := make([]byte, gcmInstance.NonceSize())
+	_, _ = io.ReadFull(rand.Reader, nonce)
+
+	ciphertext := gcmInstance.Seal(nonce, nonce, plaintext, nil)
+
+	return ciphertext, *v.keyId, nil
+
 }
 
-func (v *vaultImpl) Decrypt(ctx context.Context, ciphertext []byte) ([]byte, error) {
-	return nil, nil
+func (v *vaultImpl) DecryptBinary(ciphertext []byte, keyId string) ([]byte, error) {
+	if v.encryptionKey == nil {
+		return nil, ErrVaultNotConfiguredOrSealed
+	}
+
+	if keyId != *v.keyId {
+		// TODO: try lookup deprecated or old keys in the database
+		return nil, ErrVaultNotConfiguredOrSealed
+	}
+
+	key, err := v.encryptionKey.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer key.Destroy()
+
+	aesBlock, err := aes.NewCipher(key.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	gcmInstance, err := cipher.NewGCM(aesBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	nonceSize := gcmInstance.NonceSize()
+	nonce, encryptedText := ciphertext[:nonceSize], ciphertext[nonceSize:]
+
+	plaintext, err := gcmInstance.Open(nil, nonce, encryptedText, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return plaintext, nil
+}
+
+func (v *vaultImpl) Encrypt(plaintext string) (string, string, error) {
+	if v.encryptionKey == nil {
+		return "", "", ErrVaultNotConfiguredOrSealed
+	}
+
+	ciphertext, keyId, err := v.EncryptBinary([]byte(plaintext))
+
+	if err != nil {
+		return "", "", err
+	}
+
+	return string(ciphertext), keyId, nil
+}
+
+func (v *vaultImpl) Decrypt(ciphertext string, keyId string) (string, error) {
+	if v.encryptionKey == nil {
+		return "", ErrVaultNotConfiguredOrSealed
+	}
+
+	plaintext, err := v.DecryptBinary([]byte(ciphertext), keyId)
+
+	if err != nil {
+		return "", err
+	}
+
+	return string(plaintext), nil
 }
