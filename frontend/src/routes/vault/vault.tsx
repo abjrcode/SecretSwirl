@@ -5,7 +5,7 @@ import {
   LockVault,
 } from "../../../wailsjs/go/main/AuthController"
 import { Layout } from "../../layout"
-import { useAuth } from "../auth-provider/auth-context"
+import { useAuth } from "../../auth-provider/auth-context"
 import { VaultBuilder } from "./vault-builder"
 import { VaultDoor } from "./vault-door"
 import { useState } from "react"

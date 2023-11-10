@@ -1,21 +1,55 @@
 import { Form, useActionData, useNavigate } from "react-router-dom"
+import { ExternalLink } from "../../components/external-link"
+import { awsiamidc } from "../../../wailsjs/go/models"
 
-export function AwsIamIdcNew() {
+export function AwsIamIdcSetup() {
+  const navigate = useNavigate()
+
   const startUrl = "https://d-99670c0d3d.awsapps.com/start"
   const awsRegion = "eu-central-1"
 
-  const navigate = useNavigate()
-  const activationUrl = useActionData() as string
+  const deviceAuthFlowResult = useActionData() as
+    | awsiamidc.AuthorizeDeviceFlowResult
+    | undefined
 
-  if (activationUrl) {
+  if (deviceAuthFlowResult) {
     return (
       <Form
         method="post"
         className="flex flex-col gap-4 border-2 p-6">
         <p>
-          Please authorize the request by visiting {activationUrl}. You have a total
-          of 5 (five) minutes to do so!
+          Please authorize the request by visiting
+          <ExternalLink
+            href={deviceAuthFlowResult.verificationUri}
+            text={deviceAuthFlowResult.verificationUri}
+          />
+          . You have a total of 5 (five) minutes to do so!
         </p>
+        <input
+          type="hidden"
+          name="clientId"
+          value={deviceAuthFlowResult.clientId}
+        />
+        <input
+          type="hidden"
+          name="startUrl"
+          value={deviceAuthFlowResult.startUrl}
+        />
+        <input
+          type="hidden"
+          name="awsRegion"
+          value={deviceAuthFlowResult.region}
+        />
+        <input
+          type="hidden"
+          name="userCode"
+          value={deviceAuthFlowResult.userCode}
+        />
+        <input
+          type="hidden"
+          name="deviceCode"
+          value={deviceAuthFlowResult.deviceCode}
+        />
         <button
           name="action"
           value="activate"
