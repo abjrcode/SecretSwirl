@@ -9,27 +9,30 @@ import (
 	"time"
 
 	"github.com/abjrcode/swervo/clients/awssso"
+	"github.com/abjrcode/swervo/internal/security/encryption"
 	"github.com/abjrcode/swervo/internal/utils"
 	"github.com/rs/zerolog"
 )
 
 type AwsIdentityCenterController struct {
-	ctx          context.Context
-	logger       *zerolog.Logger
-	db           *sql.DB
-	awsSsoClient awssso.AwsSsoOidcClient
-	timeHelper   utils.Datetime
-	syncChan     chan bool
-	errChan      chan error
+	ctx               context.Context
+	logger            *zerolog.Logger
+	db                *sql.DB
+	encryptionService encryption.EncryptionService
+	awsSsoClient      awssso.AwsSsoOidcClient
+	timeHelper        utils.Datetime
+	syncChan          chan bool
+	errChan           chan error
 }
 
-func NewAwsIdentityCenterController(db *sql.DB, awsSsoClient awssso.AwsSsoOidcClient, datetime utils.Datetime) *AwsIdentityCenterController {
+func NewAwsIdentityCenterController(db *sql.DB, encryptionService encryption.EncryptionService, awsSsoClient awssso.AwsSsoOidcClient, datetime utils.Datetime) *AwsIdentityCenterController {
 	return &AwsIdentityCenterController{
-		db:           db,
-		awsSsoClient: awsSsoClient,
-		timeHelper:   datetime,
-		syncChan:     make(chan bool),
-		errChan:      make(chan error),
+		db:                db,
+		encryptionService: encryptionService,
+		awsSsoClient:      awsSsoClient,
+		timeHelper:        datetime,
+		syncChan:          make(chan bool),
+		errChan:           make(chan error),
 	}
 }
 
@@ -49,14 +52,15 @@ type AwsIdentityCenterCardData struct {
 }
 
 func (c *AwsIdentityCenterController) GetInstanceData(startUrl string) (AwsIdentityCenterCardData, error) {
-	row := c.db.QueryRowContext(c.ctx, "SELECT region, access_token, access_token_created_at, access_token_expires_in FROM aws_iam_idc WHERE start_url = ?", startUrl)
+	row := c.db.QueryRowContext(c.ctx, "SELECT region, access_token_enc, access_token_created_at, access_token_expires_in, enc_key_id FROM aws_iam_idc WHERE start_url = ?", startUrl)
 
 	var region string
-	var accessToken string
+	var accessTokenEnc string
 	var accessTokenCreatedAt int64
 	var accessTokenExpiresIn int64
+	var encKeyId string
 
-	if err := row.Scan(&region, &accessToken, &accessTokenCreatedAt, &accessTokenExpiresIn); err != nil {
+	if err := row.Scan(&region, &accessTokenEnc, &accessTokenCreatedAt, &accessTokenExpiresIn, &encKeyId); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			c.logger.Debug().Msgf("No token found for start URL [%s]", startUrl)
 			return AwsIdentityCenterCardData{
@@ -75,6 +79,16 @@ func (c *AwsIdentityCenterController) GetInstanceData(startUrl string) (AwsIdent
 	if now > accessTokenCreatedAt+accessTokenExpiresIn {
 		c.logger.Debug().Msgf("Token for start URL [%s] is expired", startUrl)
 		return AwsIdentityCenterCardData{}, errors.New("access token expired")
+	}
+
+	accessToken, err := c.encryptionService.Decrypt(accessTokenEnc, encKeyId)
+
+	if err != nil {
+		c.logger.Error().Err(err).Msg("Failed to decrypt access token")
+		return AwsIdentityCenterCardData{
+			Enabled:  false,
+			Accounts: []AwsIdentityCenterAccount{},
+		}, err
 	}
 
 	ctx := context.WithValue(c.ctx, awssso.AwsRegion("awsRegion"), region)
@@ -168,23 +182,53 @@ func (c *AwsIdentityCenterController) Setup(startUrlStr, awsRegion string) (stri
 
 		defer tx.Rollback()
 
+		clientSecretEnc, keyId, err := c.encryptionService.Encrypt(clientSecret)
+		if err != nil {
+			c.logger.Error().Err(err).Msg("Failed to encrypt client secret")
+			errChan <- err
+			return
+		}
+
+		idTokenEnc, _, err := c.encryptionService.Encrypt(tokenRes.IdToken)
+		if err != nil {
+			c.logger.Error().Err(err).Msg("Failed to encrypt id token")
+			errChan <- err
+			return
+		}
+
+		accessTokenEnc, _, err := c.encryptionService.Encrypt(tokenRes.AccessToken)
+		if err != nil {
+			c.logger.Error().Err(err).Msg("Failed to encrypt access token")
+			errChan <- err
+			return
+		}
+
+		refreshTokenEnc, _, err := c.encryptionService.Encrypt(tokenRes.RefreshToken)
+		if err != nil {
+			c.logger.Error().Err(err).Msg("Failed to encrypt refresh token")
+			errChan <- err
+			return
+		}
+
 		sql := `INSERT INTO aws_iam_idc
-	  (start_url, enabled, region, client_id, client_secret, created_at, expires_at,
-			access_token, token_type, access_token_created_at, access_token_expires_in, refresh_token)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	  (start_url, enabled, region, client_id, client_secret_enc, created_at, expires_at, id_token_enc,
+			access_token_enc, token_type, access_token_created_at, access_token_expires_in, refresh_token_enc, enc_key_id)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 		_, err = tx.ExecContext(ctx, sql,
 			startUrl.String(),
 			true,
 			awsRegion,
 			clientId,
-			clientSecret,
+			clientSecretEnc,
 			c.timeHelper.NowUnix(),
 			expiresAt,
-			tokenRes.AccessToken,
-			"Bearer",
+			idTokenEnc,
+			accessTokenEnc,
+			tokenRes.TokenType,
 			c.timeHelper.NowUnix(),
 			tokenRes.ExpiresIn,
-			tokenRes.RefreshToken)
+			refreshTokenEnc,
+			keyId)
 
 		if err != nil {
 			c.logger.Error().Err(err).Msg("Failed to create token")
@@ -222,11 +266,11 @@ func (c *AwsIdentityCenterController) FinalizeSetup(timeoutSec uint8) error {
 			c.logger.Debug().Msg("sync signal sent")
 			select {
 			case <-time.After(time.Duration(timeoutSec) * time.Second):
-				return errors.New("timeout waiting for user to login")
+				return errors.New("timeout waiting for setup to finish")
 			case err := <-c.errChan:
 				{
-					c.logger.Warn().Msgf("finalizing setup failed with: %s", err)
 					if err != nil {
+						c.logger.Error().Msgf("finalizing setup failed with: %s", err)
 						return err
 					}
 				}
@@ -243,17 +287,17 @@ func (c *AwsIdentityCenterController) FinalizeSetup(timeoutSec uint8) error {
 }
 
 func (c *AwsIdentityCenterController) registerClient(ctx context.Context, startUrl *url.URL, awsRegion string) (*awssso.RegistrationResponse, error) {
-	row := c.db.QueryRowContext(ctx, "SELECT client_id, client_secret, created_at, expires_at FROM aws_iam_idc WHERE start_url = ?", startUrl.String())
+	row := c.db.QueryRowContext(ctx, "SELECT client_id, created_at, expires_at FROM aws_iam_idc WHERE start_url = ?", startUrl.String())
 
 	var result awssso.RegistrationResponse
 
-	if err := row.Scan(&result.ClientId, &result.ClientSecret, &result.CreatedAt, &result.ExpiresAt); err != nil {
+	if err := row.Scan(&result.ClientId, &result.CreatedAt, &result.ExpiresAt); err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}
 	} else {
-		c.logger.Debug().Msgf("Client [%s] aws already registered at [%T]", startUrl, result.CreatedAt)
-		return &result, nil
+		c.logger.Error().Msgf("Client [%s] aws already registered at [%d]", startUrl, result.CreatedAt)
+		return nil, errors.New("client already registered")
 	}
 
 	friendlyClientName := fmt.Sprintf("swervo_%s_%s", startUrl.Hostname(), utils.RandomString(2))

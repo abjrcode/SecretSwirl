@@ -107,7 +107,7 @@ func main() {
 		db:     sqlDb,
 	}
 
-	awsIdcController := awsiamidc.NewAwsIdentityCenterController(sqlDb, awssso.NewAwsSsoOidcClient(), timeProvider)
+	awsIdcController := awsiamidc.NewAwsIdentityCenterController(sqlDb, vault, awssso.NewAwsSsoOidcClient(), timeProvider)
 
 	logger.Info().Msgf("PID [%d] - launching Swervo", os.Getpid())
 	if err := wails.Run(&options.App{

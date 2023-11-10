@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/abjrcode/swervo/clients/awssso"
+	"github.com/abjrcode/swervo/internal/security/vault"
 	"github.com/abjrcode/swervo/internal/testhelpers"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -58,7 +59,11 @@ func initController(t *testing.T) (*AwsIdentityCenterController, *mockAwsSsoOidc
 
 	awsClient := new(mockAwsSsoOidcClient)
 	mockDatetime := new(mockDatetime)
-	controller := NewAwsIdentityCenterController(db, awsClient, mockDatetime)
+	vault := vault.NewVault(db, mockDatetime)
+	mockDatetime.On("NowUnix").Return(1)
+	err = vault.ConfigureKey(context.Background(), "abc")
+	require.NoError(t, err)
+	controller := NewAwsIdentityCenterController(db, vault, awsClient, mockDatetime)
 	ctx := zerolog.Nop().WithContext(context.Background())
 	controller.Init(ctx)
 
