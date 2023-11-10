@@ -2,7 +2,13 @@ import React from "react"
 import { useFetcher } from "react-router-dom"
 import { awsiamidc } from "../../../wailsjs/go/models"
 
-export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
+export function AwsIamIdcCard({
+  instanceId,
+  displayName,
+}: {
+  instanceId: string
+  displayName: string
+}) {
   const fetcher = useFetcher()
 
   React.useEffect(() => {
@@ -13,10 +19,37 @@ export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
     }
   }, [instanceId, fetcher])
 
-  const cardData: awsiamidc.AwsIdentityCenterCardData = fetcher.data
+  const cardData = fetcher.data as
+    | awsiamidc.AwsIdentityCenterCardData
+    | string
+    | undefined
 
-  if (!cardData) {
+  if (cardData === undefined) {
     return <div>Loading...</div>
+  }
+
+  if (typeof cardData === "string") {
+    if (cardData === "ACCESS_TOKEN_EXPIRED") {
+      return (
+        <div className="card gap-6 px-6 py-4 card-bordered border-secondary bg-base-200 drop-shadow-lg">
+          <div
+            role="heading"
+            className="card-title justify-between">
+            <h1 className="text-2xl font-semibold">{displayName}</h1>
+          </div>
+          <div className="card-body">
+            <h2 className="text-xl">Access Token Expired</h2>
+          </div>
+          <div className="card-actions justify-between">
+            <div className="flex items-center gap-4">
+              <button className="btn btn-primary">Get new token</button>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    throw new Error(`Unexpected fetcher.data: ${cardData}`)
   }
 
   return (
@@ -24,7 +57,7 @@ export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
       <div
         role="heading"
         className="card-title justify-between">
-        <h1 className="text-2xl font-semibold">AWS IAM Identity Center</h1>
+        <h1 className="text-2xl font-semibold">{displayName}</h1>
         <input
           className="toggle"
           type="checkbox"

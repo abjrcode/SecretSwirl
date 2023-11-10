@@ -8,7 +8,7 @@ export function ErrorPage() {
     return (
       <div className="h-screen flex flex-col gap-4 items-center justify-center">
         <div>
-          <h1>Oops!</h1>
+          <h1 className="text-5xl">Oops!</h1>
           <h2>{error.status}</h2>
           <p>{error.statusText}</p>
           {error.data?.message && <p>{error.data.message}</p>}
@@ -24,7 +24,7 @@ export function ErrorPage() {
   } else {
     return (
       <div className="h-screen flex flex-col gap-4 items-center justify-center">
-        <div>Oops</div>
+        <h1 className="text-5xl">Oops</h1>
         <Link
           to="/"
           reloadDocument

@@ -23,13 +23,11 @@ export function Dashboard() {
           />
         )
       })}
-      <div>
-        <Link
-          className="btn btn-primary"
-          to="/providers/new">
-          New
-        </Link>
-      </div>
+      <Link
+        className="btn btn-primary"
+        to="/providers/new">
+        New
+      </Link>
     </>
   )
 }

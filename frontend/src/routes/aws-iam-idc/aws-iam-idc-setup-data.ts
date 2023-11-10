@@ -14,7 +14,22 @@ export async function awsIamIdcNewConfigureAction({ request }: ActionFunctionArg
     return Setup(updates["startUrl"].toString(), updates.awsRegion.toString())
   }
 
-  await FinalizeSetup(3)
+  const clientId = updates["clientId"].toString()
+  const startUrl = updates["startUrl"].toString()
+  const awsRegion = updates["awsRegion"].toString()
+  const userCode = updates["userCode"].toString()
+  const deviceCode = updates["deviceCode"].toString()
+
+  try {
+    await FinalizeSetup(clientId, startUrl, awsRegion, userCode, deviceCode)
+  } catch (e) {
+    switch (e) {
+      case "DEVICE_AUTH_FLOW_TIMED_OUT":
+        return redirect("new")
+      default:
+        throw e
+    }
+  }
 
   return redirect("/")
 }
