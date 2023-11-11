@@ -1,5 +1,5 @@
 import { ListProviders } from "../../../wailsjs/go/main/DashboardController"
 
-export async function providersNewLoader() {
+export async function providersLoader() {
   return ListProviders()
 }

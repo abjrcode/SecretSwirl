@@ -40,6 +40,7 @@ export namespace awsiamidc {
 	}
 	export class AwsIdentityCenterCardData {
 	    enabled: boolean;
+	    accessTokenExpiresIn: string;
 	    accounts: AwsIdentityCenterAccount[];
 	
 	    static createFrom(source: any = {}) {
@@ -49,6 +50,7 @@ export namespace awsiamidc {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.enabled = source["enabled"];
+	        this.accessTokenExpiresIn = source["accessTokenExpiresIn"];
 	        this.accounts = this.convertValues(source["accounts"], AwsIdentityCenterAccount);
 	    }
 	

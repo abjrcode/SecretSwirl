@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"time"
 
 	"github.com/abjrcode/swervo/clients/awssso"
 	"github.com/abjrcode/swervo/internal/security/encryption"
 	"github.com/abjrcode/swervo/internal/utils"
+	"github.com/dustin/go-humanize"
 	"github.com/rs/zerolog"
 )
 
@@ -49,11 +51,12 @@ type AwsIdentityCenterAccount struct {
 }
 
 type AwsIdentityCenterCardData struct {
-	Enabled  bool                       `json:"enabled"`
-	Accounts []AwsIdentityCenterAccount `json:"accounts"`
+	Enabled              bool                       `json:"enabled"`
+	AccessTokenExpiresIn string                     `json:"accessTokenExpiresIn"`
+	Accounts             []AwsIdentityCenterAccount `json:"accounts"`
 }
 
-func (c *AwsIdentityCenterController) GetInstanceData(startUrl string) (AwsIdentityCenterCardData, error) {
+func (c *AwsIdentityCenterController) GetInstanceData(startUrl string) (*AwsIdentityCenterCardData, error) {
 	row := c.db.QueryRowContext(c.ctx, "SELECT region, access_token_enc, access_token_created_at, access_token_expires_in, enc_key_id FROM aws_iam_idc_instances WHERE start_url = ?", startUrl)
 
 	var region string
@@ -65,33 +68,24 @@ func (c *AwsIdentityCenterController) GetInstanceData(startUrl string) (AwsIdent
 	if err := row.Scan(&region, &accessTokenEnc, &accessTokenCreatedAt, &accessTokenExpiresIn, &encKeyId); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			c.logger.Debug().Msgf("No token found for start URL [%s]", startUrl)
-			return AwsIdentityCenterCardData{
-				Enabled:  false,
-				Accounts: []AwsIdentityCenterAccount{},
-			}, nil
+			return nil, nil
 		}
 
-		return AwsIdentityCenterCardData{
-			Enabled:  false,
-			Accounts: []AwsIdentityCenterAccount{},
-		}, err
+		return nil, err
 	}
 
 	now := c.timeHelper.NowUnix()
 	if now > accessTokenCreatedAt+accessTokenExpiresIn {
 		c.logger.Debug().Msgf("Token for start URL [%s] is expired", startUrl)
 
-		return AwsIdentityCenterCardData{}, ErrAccessTokenExpired
+		return nil, ErrAccessTokenExpired
 	}
 
 	accessToken, err := c.encryptionService.Decrypt(accessTokenEnc, encKeyId)
 
 	if err != nil {
 		c.logger.Error().Err(err).Msg("Failed to decrypt access token")
-		return AwsIdentityCenterCardData{
-			Enabled:  false,
-			Accounts: []AwsIdentityCenterAccount{},
-		}, err
+		return nil, err
 	}
 
 	ctx := context.WithValue(c.ctx, awssso.AwsRegion("awsRegion"), region)
@@ -99,10 +93,7 @@ func (c *AwsIdentityCenterController) GetInstanceData(startUrl string) (AwsIdent
 
 	if err != nil {
 		c.logger.Error().Err(err).Msg("Failed to list accounts")
-		return AwsIdentityCenterCardData{
-			Enabled:  false,
-			Accounts: []AwsIdentityCenterAccount{},
-		}, err
+		return nil, err
 	}
 
 	accounts := make([]AwsIdentityCenterAccount, 0)
@@ -114,9 +105,10 @@ func (c *AwsIdentityCenterController) GetInstanceData(startUrl string) (AwsIdent
 		})
 	}
 
-	return AwsIdentityCenterCardData{
-		Enabled:  true,
-		Accounts: accounts,
+	return &AwsIdentityCenterCardData{
+		Enabled:              true,
+		AccessTokenExpiresIn: humanize.Time(time.Unix(accessTokenCreatedAt+accessTokenExpiresIn, 0)),
+		Accounts:             accounts,
 	}, nil
 }
 
@@ -275,6 +267,129 @@ func (c *AwsIdentityCenterController) FinalizeSetup(clientId, startUrl, region, 
 
 	if err != nil {
 		c.logger.Error().Err(err).Msg("Failed to commit transaction")
+		return err
+	}
+
+	return nil
+}
+
+func (c *AwsIdentityCenterController) RefreshAccessToken(startUrlStr string) (*AuthorizeDeviceFlowResult, error) {
+	startUrl, err := url.Parse(startUrlStr)
+
+	if startUrl.Scheme == "" || startUrl.Host == "" {
+		c.logger.Error().Msgf("Invalid start URL [%s]", startUrlStr)
+		return nil, errors.New("invalid start URL")
+	}
+
+	if err != nil {
+		c.logger.Error().Err(err).Msg("Failed to parse start URL")
+		return nil, err
+	}
+
+	var awsRegion string
+	row := c.db.QueryRowContext(c.ctx, "SELECT region FROM aws_iam_idc_instances WHERE start_url = ?", startUrlStr)
+
+	if err := row.Scan(&awsRegion); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			c.logger.Debug().Msgf("No instance found for start URL [%s]", startUrlStr)
+			// TODO: probably should panic
+			return nil, errors.New("no instance found for start URL")
+		}
+	}
+
+	ctx := context.WithValue(c.ctx, awssso.AwsRegion("awsRegion"), awsRegion)
+	regRes, err := c.getOrRegisterClient(ctx)
+
+	if err != nil {
+		c.logger.Error().Err(err).Msg("Failed to get or register client")
+		return nil, err
+	}
+
+	authorizeRes, err := c.authorizeDevice(ctx, startUrl, regRes.ClientId, regRes.ClientSecret)
+
+	if err != nil {
+		c.logger.Error().Err(err).Msg("Failed to authorize device")
+		return nil, err
+	}
+
+	return &AuthorizeDeviceFlowResult{
+		ClientId:        regRes.ClientId,
+		StartUrl:        startUrlStr,
+		Region:          awsRegion,
+		VerificationUri: authorizeRes.VerificationUriComplete,
+		UserCode:        authorizeRes.UserCode,
+		ExpiresIn:       authorizeRes.ExpiresIn,
+		DeviceCode:      authorizeRes.DeviceCode,
+	}, nil
+}
+
+func (c *AwsIdentityCenterController) FinalizeRefreshAccessToken(clientId, startUrl, region, userCode, deviceCode string) error {
+	row := c.db.QueryRowContext(c.ctx, "SELECT client_secret_enc, enc_key_id FROM aws_iam_idc_clients")
+
+	var clientSecretEnc string
+	var encKeyId string
+
+	if err := row.Scan(&clientSecretEnc, &encKeyId); err != nil {
+		return err
+	}
+
+	clientSecret, err := c.encryptionService.Decrypt(clientSecretEnc, encKeyId)
+
+	if err != nil {
+		c.logger.Error().Err(err).Msg("Failed to decrypt client secret")
+		return err
+	}
+
+	ctx := context.WithValue(c.ctx, awssso.AwsRegion("awsRegion"), region)
+	tokenRes, err := c.getToken(ctx, clientId, clientSecret, deviceCode, userCode)
+
+	if err != nil {
+		if errors.Is(err, awssso.ErrDeviceCodeExpired) {
+			c.logger.Error().Err(err).Msg("failed to get token because user and device code expired")
+			return ErrDeviceAuthFlowTimedOut
+		}
+		c.logger.Error().Err(err).Msg("Failed to get token")
+		return err
+	}
+
+	idTokenEnc, keyId, err := c.encryptionService.Encrypt(tokenRes.IdToken)
+	if err != nil {
+		c.logger.Error().Err(err).Msg("Failed to encrypt id token")
+		return err
+	}
+
+	accessTokenEnc, _, err := c.encryptionService.Encrypt(tokenRes.AccessToken)
+	if err != nil {
+		c.logger.Error().Err(err).Msg("Failed to encrypt access token")
+		return err
+	}
+
+	refreshTokenEnc, _, err := c.encryptionService.Encrypt(tokenRes.RefreshToken)
+	if err != nil {
+		c.logger.Error().Err(err).Msg("Failed to encrypt refresh token")
+		return err
+	}
+
+	sql := `UPDATE aws_iam_idc_instances SET
+		id_token_enc = ?,
+		access_token_enc = ?,
+		token_type = ?,
+		access_token_created_at = ?,
+		access_token_expires_in = ?,
+		refresh_token_enc = ?,
+		enc_key_id = ?
+		WHERE start_url = ?`
+	_, err = c.db.ExecContext(ctx, sql,
+		idTokenEnc,
+		accessTokenEnc,
+		tokenRes.TokenType,
+		c.timeHelper.NowUnix(),
+		tokenRes.ExpiresIn,
+		refreshTokenEnc,
+		keyId, startUrl)
+
+	if err != nil {
+		c.logger.Error().Err(err).Msg("Failed to refresh access token")
 		return err
 	}
 

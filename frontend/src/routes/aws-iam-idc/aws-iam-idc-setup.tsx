@@ -1,6 +1,6 @@
 import { Form, useActionData, useNavigate } from "react-router-dom"
-import { ExternalLink } from "../../components/external-link"
 import { awsiamidc } from "../../../wailsjs/go/models"
+import { useEffect } from "react"
 
 export function AwsIamIdcSetup() {
   const navigate = useNavigate()
@@ -12,60 +12,21 @@ export function AwsIamIdcSetup() {
     | awsiamidc.AuthorizeDeviceFlowResult
     | undefined
 
-  if (deviceAuthFlowResult) {
-    return (
-      <Form
-        method="post"
-        className="flex flex-col gap-4 border-2 p-6">
-        <p>
-          Please authorize the request by visiting
-          <ExternalLink
-            href={deviceAuthFlowResult.verificationUri}
-            text={deviceAuthFlowResult.verificationUri}
-          />
-          . You have a total of 5 (five) minutes to do so!
-        </p>
-        <input
-          type="hidden"
-          name="clientId"
-          value={deviceAuthFlowResult.clientId}
-        />
-        <input
-          type="hidden"
-          name="startUrl"
-          value={deviceAuthFlowResult.startUrl}
-        />
-        <input
-          type="hidden"
-          name="awsRegion"
-          value={deviceAuthFlowResult.region}
-        />
-        <input
-          type="hidden"
-          name="userCode"
-          value={deviceAuthFlowResult.userCode}
-        />
-        <input
-          type="hidden"
-          name="deviceCode"
-          value={deviceAuthFlowResult.deviceCode}
-        />
-        <button
-          name="action"
-          value="activate"
-          type="submit"
-          className="btn btn-primary">
-          Activate
-        </button>
-        <button
-          type="reset"
-          onClick={() => navigate("/")}
-          className="btn btn-secondary">
-          Abort
-        </button>
-      </Form>
-    )
-  }
+  useEffect(() => {
+    if (deviceAuthFlowResult) {
+      navigate("../device-auth", {
+        state: {
+          action: "setup",
+          clientId: deviceAuthFlowResult.clientId,
+          startUrl: deviceAuthFlowResult.startUrl,
+          awsRegion: deviceAuthFlowResult.region,
+          verificationUriComplete: deviceAuthFlowResult.verificationUri,
+          userCode: deviceAuthFlowResult.userCode,
+          deviceCode: deviceAuthFlowResult.deviceCode,
+        },
+      })
+    }
+  }, [navigate, deviceAuthFlowResult])
 
   return (
     <Form
@@ -91,8 +52,6 @@ export function AwsIamIdcSetup() {
         <option value={awsRegion}>{awsRegion}</option>
       </select>
       <button
-        name="action"
-        value="configure"
         type="submit"
         className="btn btn-primary">
         Configure

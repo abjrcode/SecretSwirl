@@ -25,7 +25,7 @@ export function Dashboard() {
       })}
       <Link
         className="btn btn-primary"
-        to="/providers/new">
+        to="/providers">
         New
       </Link>
     </>
