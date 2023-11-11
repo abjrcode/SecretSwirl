@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react"
-import { useAuth } from "../auth-provider/auth-context"
+import { useAuth } from "../../auth-provider/auth-context"
 
 export function VaultDoor({
   verifyCombo,
