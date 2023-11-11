@@ -443,7 +443,42 @@ func (c *AwsIdentityCenterController) getOrRegisterClient(ctx context.Context) (
 		return output, nil
 	}
 
-	// TODO: check if client is expired and re-register if so
+	if c.timeHelper.NowUnix() > result.ExpiresAt {
+		c.logger.Info().Msg("client expired. registering new client")
+
+		friendlyClientName := fmt.Sprintf("swervo_%s", utils.RandomString(6))
+		c.logger.Info().Msgf("registering new client [%s]", friendlyClientName)
+
+		output, err := c.awsSsoClient.RegisterClient(ctx, friendlyClientName)
+		if err != nil {
+			return nil, err
+		}
+
+		clientSecretEnc, encKeyId, err := c.encryptionService.Encrypt(output.ClientSecret)
+
+		if err != nil {
+			c.logger.Error().Err(err).Msg("failed to encrypt client secret")
+			return nil, err
+		}
+
+		_, err = c.db.ExecContext(ctx, `UPDATE aws_iam_idc_clients SET
+			client_id = ?,
+			client_secret_enc = ?,
+			created_at = ?,
+			expires_at = ?,
+			enc_key_id = ?
+			WHERE client_id = ?`,
+			output.ClientId, clientSecretEnc, output.CreatedAt, output.ExpiresAt, encKeyId, result.ClientId)
+
+		if err != nil {
+			c.logger.Error().Err(err).Msg("failed to update client in database")
+			return nil, err
+		}
+
+		c.logger.Info().Msgf("client [%s] registered successfully", friendlyClientName)
+
+		return output, nil
+	}
 
 	var err error
 	result.ClientSecret, err = c.encryptionService.Decrypt(result.ClientSecret, encKeyId)
