@@ -1,5 +1,6 @@
 import React from "react"
-import { useFetcher } from "react-router-dom"
+import { useFetcher, useNavigate } from "react-router-dom"
+import { RefreshAccessToken } from "../../../wailsjs/go/awsiamidc/AwsIdentityCenterController"
 import { awsiamidc } from "../../../wailsjs/go/models"
 
 export function AwsIamIdcCard({
@@ -9,7 +10,24 @@ export function AwsIamIdcCard({
   instanceId: string
   displayName: string
 }) {
+  const navigate = useNavigate()
   const fetcher = useFetcher()
+
+  async function authorizeDevice(instanceId: string) {
+    const deviceAuthFlowResult = await RefreshAccessToken(instanceId)
+
+    navigate("/providers/aws-iam-idc/device-auth", {
+      state: {
+        action: "refresh",
+        clientId: deviceAuthFlowResult.clientId,
+        startUrl: deviceAuthFlowResult.startUrl,
+        awsRegion: deviceAuthFlowResult.region,
+        verificationUriComplete: deviceAuthFlowResult.verificationUri,
+        userCode: deviceAuthFlowResult.userCode,
+        deviceCode: deviceAuthFlowResult.deviceCode,
+      },
+    })
+  }
 
   React.useEffect(() => {
     if (fetcher.state === "idle" && !fetcher.data) {
@@ -42,7 +60,11 @@ export function AwsIamIdcCard({
           </div>
           <div className="card-actions justify-between">
             <div className="flex items-center gap-4">
-              <button className="btn btn-primary">Get new token</button>
+              <button
+                className="btn btn-primary"
+                onClick={async () => await authorizeDevice(instanceId)}>
+                Get new token
+              </button>
             </div>
           </div>
         </div>
@@ -58,11 +80,6 @@ export function AwsIamIdcCard({
         role="heading"
         className="card-title justify-between">
         <h1 className="text-2xl font-semibold">{displayName}</h1>
-        <input
-          className="toggle"
-          type="checkbox"
-          checked={cardData.enabled}
-        />
       </div>
       <div className="card-body">
         <h2 className="text-xl">Accounts</h2>
@@ -96,14 +113,11 @@ export function AwsIamIdcCard({
           ))}
         </ul>
       </div>
-      <div className="card-actions justify-between">
-        <div className="flex items-center gap-4">
-          <button className="btn btn-primary">Run NOW</button>
-          <a className="link link-primary">Settings</a>
-        </div>
+      <div className="card-actions items-center justify-between">
         <div className="flex flex-col gap-2">
-          <p className="w-44 badge badge-outline">last Rotation: yeserday</p>
-          <p className="w-44 badge badge-outline">next Rotation: tomorrow</p>
+          <p className="badge badge-outline">
+            Expires In: {cardData.accessTokenExpiresIn}
+          </p>
         </div>
       </div>
     </div>

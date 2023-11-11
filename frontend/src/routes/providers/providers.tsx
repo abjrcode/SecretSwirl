@@ -1,7 +1,7 @@
 import { Link, Outlet, useLoaderData, useOutlet } from "react-router-dom"
 import { main } from "../../../wailsjs/go/models"
 
-export function ProvidersNew() {
+export function Providers() {
   const outlet = useOutlet()
   const providers = useLoaderData() as main.Provider[]
 
@@ -15,7 +15,7 @@ export function ProvidersNew() {
               <li key={provider.code}>
                 <Link
                   className="btn btn-primary"
-                  to={provider.code}>
+                  to={`${provider.code}/setup`}>
                   {provider.name}
                 </Link>
               </li>
