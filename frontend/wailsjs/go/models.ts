@@ -1,5 +1,29 @@
 export namespace awsiamidc {
 	
+	export class AuthorizeDeviceFlowResult {
+	    clientId: string;
+	    startUrl: string;
+	    region: string;
+	    verificationUri: string;
+	    userCode: string;
+	    expiresIn: number;
+	    deviceCode: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AuthorizeDeviceFlowResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.clientId = source["clientId"];
+	        this.startUrl = source["startUrl"];
+	        this.region = source["region"];
+	        this.verificationUri = source["verificationUri"];
+	        this.userCode = source["userCode"];
+	        this.expiresIn = source["expiresIn"];
+	        this.deviceCode = source["deviceCode"];
+	    }
+	}
 	export class AwsIdentityCenterAccount {
 	    accountId: string;
 	    accountName: string;
@@ -16,6 +40,7 @@ export namespace awsiamidc {
 	}
 	export class AwsIdentityCenterCardData {
 	    enabled: boolean;
+	    accessTokenExpiresIn: string;
 	    accounts: AwsIdentityCenterAccount[];
 	
 	    static createFrom(source: any = {}) {
@@ -25,6 +50,7 @@ export namespace awsiamidc {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.enabled = source["enabled"];
+	        this.accessTokenExpiresIn = source["accessTokenExpiresIn"];
 	        this.accounts = this.convertValues(source["accounts"], AwsIdentityCenterAccount);
 	    }
 	
@@ -53,7 +79,7 @@ export namespace main {
 	
 	export class ConfiguredProvider {
 	    code: string;
-	    name: string;
+	    displayName: string;
 	    instanceId: string;
 	    isFavorite: boolean;
 	    iconSvgBase64: string;
@@ -65,7 +91,7 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.code = source["code"];
-	        this.name = source["name"];
+	        this.displayName = source["displayName"];
 	        this.instanceId = source["instanceId"];
 	        this.isFavorite = source["isFavorite"];
 	        this.iconSvgBase64 = source["iconSvgBase64"];

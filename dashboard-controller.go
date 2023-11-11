@@ -21,7 +21,7 @@ type Provider struct {
 
 type ConfiguredProvider struct {
 	Code          string `json:"code"`
-	Name          string `json:"name"`
+	DisplayName   string `json:"displayName"`
 	InstanceId    string `json:"instanceId"`
 	IsFavorite    bool   `json:"isFavorite"`
 	IconSvgBase64 string `json:"iconSvgBase64"`
@@ -59,7 +59,7 @@ func (c *DashboardController) ListFavorites() ([]ConfiguredProvider, error) {
 
 	for rows.Next() {
 		var provider ConfiguredProvider
-		err := rows.Scan(&provider.Code, &provider.InstanceId, &provider.Name, &provider.IsFavorite)
+		err := rows.Scan(&provider.Code, &provider.InstanceId, &provider.DisplayName, &provider.IsFavorite)
 		if err != nil {
 			return []ConfiguredProvider{}, err
 		}

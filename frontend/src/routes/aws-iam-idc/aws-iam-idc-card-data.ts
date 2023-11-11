@@ -7,5 +7,16 @@ export async function awsIamIdcCardLoader({ request }: { request: Request }) {
     throw new Response('instanceId is required', { status: 400 })
   }
 
-  return GetInstanceData(instanceId)
+  try {
+    return await GetInstanceData(instanceId)
+  }
+  catch (error) {
+    if (error === "ACCESS_TOKEN_EXPIRED"
+      || error === "CLIENT_EXPIRED"
+      || error === "CLIENT_ALREADY_REGISTERED") {
+      return error
+    }
+
+    throw error
+  }
 }

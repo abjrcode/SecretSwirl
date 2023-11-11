@@ -1,37 +1,32 @@
 import { Form, useActionData, useNavigate } from "react-router-dom"
+import { awsiamidc } from "../../../wailsjs/go/models"
+import { useEffect } from "react"
 
-export function AwsIamIdcNew() {
+export function AwsIamIdcSetup() {
+  const navigate = useNavigate()
+
   const startUrl = "https://my-app.awsapps.com/start"
   const awsRegion = "eu-central-1"
 
-  const navigate = useNavigate()
-  const activationUrl = useActionData() as string
+  const deviceAuthFlowResult = useActionData() as
+    | awsiamidc.AuthorizeDeviceFlowResult
+    | undefined
 
-  if (activationUrl) {
-    return (
-      <Form
-        method="post"
-        className="flex flex-col gap-4 border-2 p-6">
-        <p>
-          Please authorize the request by visiting {activationUrl}. You have a total
-          of 5 (five) minutes to do so!
-        </p>
-        <button
-          name="action"
-          value="activate"
-          type="submit"
-          className="btn btn-primary">
-          Activate
-        </button>
-        <button
-          type="reset"
-          onClick={() => navigate("/")}
-          className="btn btn-secondary">
-          Abort
-        </button>
-      </Form>
-    )
-  }
+  useEffect(() => {
+    if (deviceAuthFlowResult) {
+      navigate("../device-auth", {
+        state: {
+          action: "setup",
+          clientId: deviceAuthFlowResult.clientId,
+          startUrl: deviceAuthFlowResult.startUrl,
+          awsRegion: deviceAuthFlowResult.region,
+          verificationUriComplete: deviceAuthFlowResult.verificationUri,
+          userCode: deviceAuthFlowResult.userCode,
+          deviceCode: deviceAuthFlowResult.deviceCode,
+        },
+      })
+    }
+  }, [navigate, deviceAuthFlowResult])
 
   return (
     <Form
@@ -57,8 +52,6 @@ export function AwsIamIdcNew() {
         <option value={awsRegion}>{awsRegion}</option>
       </select>
       <button
-        name="action"
-        value="configure"
         type="submit"
         className="btn btn-primary">
         Configure

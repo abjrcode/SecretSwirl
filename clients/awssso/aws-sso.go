@@ -2,11 +2,13 @@ package awssso
 
 import (
 	"context"
+	"errors"
 	"net/url"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sso"
 	"github.com/aws/aws-sdk-go-v2/service/ssooidc"
+	"github.com/aws/aws-sdk-go-v2/service/ssooidc/types"
 )
 
 var SupportedAwsRegions = map[string]string{
@@ -35,6 +37,10 @@ var SupportedAwsRegions = map[string]string{
 	"sa-east-1":      "South America (São Paulo)",
 }
 
+var (
+	ErrDeviceCodeExpired = errors.New("device code expired")
+)
+
 type AwsRegion string
 
 type RegistrationResponse struct {
@@ -43,8 +49,10 @@ type RegistrationResponse struct {
 }
 
 type AuthorizationResponse struct {
-	VerificationUri, UserCode, DeviceCode string
-	ExpiresIn                             int32
+	VerificationUri, VerificationUriComplete string
+	UserCode, DeviceCode                     string
+	Interval                                 int32
+	ExpiresIn                                int32
 }
 
 type GetTokenResponse struct {
@@ -116,10 +124,12 @@ func (c *awsSsoClientImpl) StartDeviceAuthorization(ctx context.Context, startUr
 	}
 
 	return &AuthorizationResponse{
-		VerificationUri: *output.VerificationUri,
-		UserCode:        *output.UserCode,
-		DeviceCode:      *output.DeviceCode,
-		ExpiresIn:       output.ExpiresIn,
+		VerificationUri:         *output.VerificationUri,
+		VerificationUriComplete: *output.VerificationUriComplete,
+		UserCode:                *output.UserCode,
+		DeviceCode:              *output.DeviceCode,
+		ExpiresIn:               output.ExpiresIn,
+		Interval:                output.Interval,
 	}, nil
 }
 
@@ -135,13 +145,17 @@ func (c *awsSsoClientImpl) CreateToken(ctx context.Context, clientId, clientSecr
 	})
 
 	if err != nil {
+		var ete *types.ExpiredTokenException
+		if errors.As(err, &ete) {
+			return nil, ErrDeviceCodeExpired
+		}
 		return nil, err
 	}
 
 	return &GetTokenResponse{
-		IdToken:      "",
+		IdToken:      "", // Not supported by AWS SSO
 		AccessToken:  *output.AccessToken,
-		RefreshToken: "",
+		RefreshToken: "", // Not supported by AWS SSO
 		TokenType:    *output.TokenType,
 		ExpiresIn:    output.ExpiresIn,
 	}, nil
