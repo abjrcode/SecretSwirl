@@ -17,6 +17,7 @@ import { IsVaultConfigured } from "../wailsjs/go/main/AuthController"
 import { WailsProvider } from "./wails-provider/wails-provider"
 import { AwsIamIdcDeviceAuth } from "./routes/aws-iam-idc/aws-iam-idc-device-auth"
 import { awsIamIdcDeviceAuthAction } from "./routes/aws-iam-idc/aws-iam-idc-device-auth-data"
+import { ToastProvider } from "./toast-provider/toast-provider"
 
 if (import.meta.env.DEV) {
   document.documentElement.classList.add("debug-screens")
@@ -76,7 +77,9 @@ void (async function main() {
     <React.StrictMode>
       <AuthProvider initialAuthState={initialState}>
         <WailsProvider>
-          <RouterProvider router={router} />
+          <ToastProvider>
+            <RouterProvider router={router} />
+          </ToastProvider>
         </WailsProvider>
       </AuthProvider>
     </React.StrictMode>,

@@ -34,6 +34,9 @@ module.exports = {
       position: ["bottom", "right"],
     },
     extend: {
+      transitionProperty: {
+        "max-height": "max-height",
+      },
       keyframes: {
         wiggle: {
           "0%, 100%": { transform: "rotate(-3deg)" },
@@ -54,6 +57,22 @@ module.exports = {
           },
           "100%": {
             transform: "translateX(5px)",
+          },
+        },
+        slideInLeft: {
+          from: {
+            transform: "translate3d(-100%, 0, 0)",
+          },
+          to: {
+            transform: "translate3d(0, 0, 0)",
+          },
+        },
+        slideOutLeft: {
+          from: {
+            transform: "translate3d(0, 0, 0)",
+          },
+          to: {
+            transform: "translate3d(-110%, 0, 0)",
           },
         },
       },
