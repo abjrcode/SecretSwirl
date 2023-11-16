@@ -56,3 +56,11 @@ func (app *AppController) ShowErrorDialog(msg string) {
 		Message: msg,
 	})
 }
+
+func (app *AppController) ShowWarningDialog(msg string) {
+	wailsRuntime.MessageDialog(app.ctx, wailsRuntime.MessageDialogOptions{
+		Type:    wailsRuntime.WarningDialog,
+		Title:   "Warning",
+		Message: msg,
+	})
+}
