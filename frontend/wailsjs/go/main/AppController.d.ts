@@ -5,3 +5,5 @@ import {context} from '../models';
 export function Init(arg1:context.Context):Promise<void>;
 
 export function ShowErrorDialog(arg1:string):Promise<void>;
+
+export function ShowWarningDialog(arg1:string):Promise<void>;

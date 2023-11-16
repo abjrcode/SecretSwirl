@@ -38,7 +38,9 @@ var SupportedAwsRegions = map[string]string{
 }
 
 var (
-	ErrDeviceCodeExpired = errors.New("device code expired")
+	ErrDeviceFlowNotAuthorized = errors.New("device flow not authorized")
+	ErrDeviceCodeExpired       = errors.New("device code expired")
+	ErrAccessTokenExpired      = errors.New("device code expired")
 )
 
 type AwsRegion string
@@ -145,10 +147,12 @@ func (c *awsSsoClientImpl) CreateToken(ctx context.Context, clientId, clientSecr
 	})
 
 	if err != nil {
-		var ete *types.ExpiredTokenException
-		if errors.As(err, &ete) {
-			return nil, ErrDeviceCodeExpired
+		var ape *types.AuthorizationPendingException
+
+		if errors.As(err, &ape) {
+			return nil, ErrDeviceFlowNotAuthorized
 		}
+
 		return nil, err
 	}
 
@@ -169,6 +173,12 @@ func (c *awsSsoClientImpl) ListAccounts(ctx context.Context, accessToken string)
 	})
 
 	if err != nil {
+		var ete *types.ExpiredTokenException
+
+		if errors.As(err, &ete) {
+			return nil, ErrAccessTokenExpired
+		}
+
 		return nil, err
 	}
 

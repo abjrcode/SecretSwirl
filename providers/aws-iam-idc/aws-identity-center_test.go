@@ -303,7 +303,7 @@ func TestRefreshAccessToken(t *testing.T) {
 	startUrl := "https://test-start-url.aws-apps.com/start"
 	region := "eu-west-1"
 
-	controller, mockAws, _ := simulateSuccessfulSetup(t, startUrl, region)
+	controller, mockAws, mockTimeProvider := simulateSuccessfulSetup(t, startUrl, region)
 
 	mockAuthRes := awssso.AuthorizationResponse{
 		DeviceCode:              "test-device-code-2",
@@ -313,6 +313,7 @@ func TestRefreshAccessToken(t *testing.T) {
 	}
 	mockAws.On("StartDeviceAuthorization", mock.Anything, mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(&mockAuthRes, nil)
 
+	mockTimeProvider.On("NowUnix").Return(10)
 	refreshRes, err := controller.RefreshAccessToken(startUrl)
 	require.NoError(t, err)
 
@@ -369,6 +370,7 @@ func TestFinalizeRefreshAccessToken(t *testing.T) {
 	}
 	mockAws.On("StartDeviceAuthorization", mock.Anything, mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(&mockAuthRes, nil)
 
+	mockTimeProvider.On("NowUnix").Return(10)
 	refreshRes, err := controller.RefreshAccessToken(startUrl)
 	require.NoError(t, err)
 
