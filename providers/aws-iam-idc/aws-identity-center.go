@@ -18,7 +18,6 @@ import (
 var (
 	ErrDeviceAuthFlowTimedOut    = errors.New("DEVICE_AUTH_FLOW_TIMED_OUT")
 	ErrAccessTokenExpired        = errors.New("ACCESS_TOKEN_EXPIRED")
-	ErrClientExpired             = errors.New("CLIENT_EXPIRED")
 	ErrInstanceAlreadyRegistered = errors.New("INSTANCE_ALREADY_REGISTERED")
 )
 
