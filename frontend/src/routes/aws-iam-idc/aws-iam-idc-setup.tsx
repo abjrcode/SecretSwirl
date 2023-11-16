@@ -1,32 +1,37 @@
 import { Form, useActionData, useNavigate } from "react-router-dom"
-import { awsiamidc } from "../../../wailsjs/go/models"
 import { useEffect } from "react"
+import { useWails } from "../../wails-provider/wails-context"
+import { AwsIamIdcSetupResult } from "./aws-iam-idc-setup-data"
 
 export function AwsIamIdcSetup() {
+  const wails = useWails()
   const navigate = useNavigate()
 
   const startUrl = "https://my-app.awsapps.com/start"
   const awsRegion = "eu-central-1"
 
-  const deviceAuthFlowResult = useActionData() as
-    | awsiamidc.AuthorizeDeviceFlowResult
-    | undefined
+  const setupResult = useActionData() as AwsIamIdcSetupResult | undefined
 
   useEffect(() => {
-    if (deviceAuthFlowResult) {
-      navigate("../device-auth", {
-        state: {
-          action: "setup",
-          clientId: deviceAuthFlowResult.clientId,
-          startUrl: deviceAuthFlowResult.startUrl,
-          awsRegion: deviceAuthFlowResult.region,
-          verificationUriComplete: deviceAuthFlowResult.verificationUri,
-          userCode: deviceAuthFlowResult.userCode,
-          deviceCode: deviceAuthFlowResult.deviceCode,
-        },
-      })
+    if (setupResult) {
+      if (setupResult.success) {
+        const result = setupResult.result
+        navigate("../device-auth", {
+          state: {
+            action: "setup",
+            clientId: result.clientId,
+            startUrl: result.startUrl,
+            awsRegion: result.region,
+            verificationUriComplete: result.verificationUri,
+            userCode: result.userCode,
+            deviceCode: result.deviceCode,
+          },
+        })
+      } else {
+        wails.runtime.ShowErrorDialog(setupResult.error)
+      }
     }
-  }, [navigate, deviceAuthFlowResult])
+  }, [navigate, setupResult, wails])
 
   return (
     <Form
