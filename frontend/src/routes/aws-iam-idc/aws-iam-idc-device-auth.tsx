@@ -6,8 +6,10 @@ import {
 } from "./aws-iam-idc-device-auth-data"
 import { useEffect, useRef } from "react"
 import { useWails } from "../../wails-provider/wails-context"
+import { useToaster } from "../../toast-provider/toast-context"
 
 export function AwsIamIdcDeviceAuth() {
+  const toaster = useToaster()
   const wails = useWails()
   const location = useLocation()
   const navigate = useNavigate()
@@ -54,9 +56,20 @@ export function AwsIamIdcDeviceAuth() {
             "The device authorization flow timed out and we have to start over",
           )
           return navigate("/")
+        case AwsIamIdcDeviceAuthFlowError.ErrInvalidStartUrl:
+          wails.runtime.ShowWarningDialog("The Start URL is not valid")
+          return
+        case AwsIamIdcDeviceAuthFlowError.ErrInvalidAwsRegion:
+          wails.runtime.ShowWarningDialog("The AWS region is not valid")
+          return
+        case AwsIamIdcDeviceAuthFlowError.ErrTransientAwsClientError:
+          toaster.showWarning(
+            "There was an error, but it might work if you try again a bit later",
+          )
+          return
       }
     }
-  }, [wails, navigate, actionData])
+  }, [toaster, wails, navigate, actionData])
 
   return (
     <Form

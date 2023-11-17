@@ -38,6 +38,7 @@ var SupportedAwsRegions = map[string]string{
 }
 
 var (
+	ErrInvalidStartUrl         = errors.New("invalid start url")
 	ErrDeviceFlowNotAuthorized = errors.New("device flow not authorized")
 	ErrDeviceCodeExpired       = errors.New("device code expired")
 	ErrAccessTokenExpired      = errors.New("device code expired")
@@ -122,6 +123,11 @@ func (c *awsSsoClientImpl) StartDeviceAuthorization(ctx context.Context, startUr
 	})
 
 	if err != nil {
+		var ire *types.InvalidRequestException
+
+		if errors.As(err, &ire) {
+			return nil, ErrInvalidStartUrl
+		}
 		return nil, err
 	}
 
