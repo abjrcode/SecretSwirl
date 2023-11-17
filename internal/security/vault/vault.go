@@ -57,10 +57,12 @@ type vaultImpl struct {
 func NewVault(db *sql.DB, timeSvc utils.Datetime, logger *zerolog.Logger, errHandler logging.ErrorHandler) Vault {
 	memguard.CatchInterrupt()
 
+	enrichedLogger := logger.With().Str("component", "vault").Logger()
+
 	return &vaultImpl{
 		timeSvc:    timeSvc,
 		db:         db,
-		logger:     logger,
+		logger:     &enrichedLogger,
 		errHandler: errHandler,
 	}
 }

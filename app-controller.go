@@ -49,7 +49,8 @@ func NewAppController() *AppController {
 
 func (app *AppController) Init(ctx context.Context, errorHandler logging.ErrorHandler) {
 	app.ctx = ctx
-	app.logger = zerolog.Ctx(ctx)
+	enrichedLogger := zerolog.Ctx(ctx).With().Str("component", "app_controller").Logger()
+	app.logger = &enrichedLogger
 	app.errorHandler = errorHandler
 }
 
