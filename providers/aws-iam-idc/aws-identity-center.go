@@ -46,7 +46,8 @@ func NewAwsIdentityCenterController(db *sql.DB, encryptionService encryption.Enc
 
 func (controller *AwsIdentityCenterController) Init(ctx context.Context, errorHandler logging.ErrorHandler) {
 	controller.ctx = ctx
-	controller.logger = zerolog.Ctx(ctx)
+	enrichedLogger := zerolog.Ctx(ctx).With().Str("component", "aws_idc_controller").Logger()
+	controller.logger = &enrichedLogger
 	controller.errHandler = errorHandler
 }
 

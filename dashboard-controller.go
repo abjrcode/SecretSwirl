@@ -40,9 +40,17 @@ var (
 
 var supportedProviders []Provider
 
+func NewDashboardController(db *sql.DB) *DashboardController {
+
+	return &DashboardController{
+		db: db,
+	}
+}
+
 func (c *DashboardController) Init(ctx context.Context, errorHandler logging.ErrorHandler) {
 	c.ctx = ctx
-	c.logger = zerolog.Ctx(ctx)
+	enrichedLogger := zerolog.Ctx(ctx).With().Str("component", "dashboard_controller").Logger()
+	c.logger = &enrichedLogger
 	c.errorHandler = errorHandler
 
 	supportedProviders = make([]Provider, 0, len(SupportedProviders))

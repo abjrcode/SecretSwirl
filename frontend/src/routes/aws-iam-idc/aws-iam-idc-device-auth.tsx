@@ -16,8 +16,9 @@ export function AwsIamIdcDeviceAuth() {
   const authFlowState = useRef(location.state)
 
   if (
+    location.state &&
     authFlowState.current.verificationUriComplete !==
-    location.state.verificationUriComplete
+      location.state.verificationUriComplete
   ) {
     authFlowState.current = location.state
   }

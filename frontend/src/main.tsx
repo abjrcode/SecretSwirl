@@ -1,4 +1,5 @@
 import "./tailwind.css"
+import "./logger-adapter"
 import React from "react"
 import ReactDOM from "react-dom/client"
 import { createHashRouter, RouterProvider } from "react-router-dom"
@@ -24,6 +25,8 @@ const devMode = import.meta.env.DEV
 if (devMode) {
   document.documentElement.classList.add("debug-screens")
 }
+
+console.log("starting frontend application ...")
 
 void (async function main() {
   const router = createHashRouter([

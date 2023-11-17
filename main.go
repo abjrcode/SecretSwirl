@@ -96,14 +96,8 @@ func main() {
 	vault := vault.NewVault(sqlDb, timeProvider, &logger, errorHandler)
 	defer vault.Close()
 
-	authController := &AuthController{
-		logger: &logger,
-		vault:  vault,
-	}
-	dashboardController := &DashboardController{
-		logger: &logger,
-		db:     sqlDb,
-	}
+	authController := NewAuthController(vault)
+	dashboardController := NewDashboardController(sqlDb)
 
 	awsIdcController := awsiamidc.NewAwsIdentityCenterController(sqlDb, vault, awssso.NewAwsSsoOidcClient(), timeProvider)
 
@@ -116,6 +110,7 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
+		Logger: logging.NewWailsLoggerAdapter(&logger),
 		OnStartup: func(ctx context.Context) {
 			errorHandler.InitWailsContext(&ctx)
 
