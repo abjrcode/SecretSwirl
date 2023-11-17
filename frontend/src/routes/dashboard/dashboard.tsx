@@ -9,6 +9,7 @@ const ProviderComponentMap = new Map<string, React.FC<any>>([
 
 export function Dashboard() {
   const favoriteProviders = useLoaderData() as main.ConfiguredProvider[]
+
   return (
     <>
       {...favoriteProviders.map((provider) => {

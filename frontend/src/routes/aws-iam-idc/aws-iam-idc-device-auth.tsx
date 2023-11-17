@@ -1,9 +1,26 @@
-import { Form, useLocation, useNavigate } from "react-router-dom"
+import { Form, useActionData, useLocation, useNavigate } from "react-router-dom"
 import { ExternalLink } from "../../components/external-link"
+import {
+  AwsIamIdcDeviceAuthFlowError,
+  AwsIamIdcDeviceAuthFlowResult,
+} from "./aws-iam-idc-device-auth-data"
+import { useEffect, useRef } from "react"
+import { useWails } from "../../wails-provider/wails-context"
 
 export function AwsIamIdcDeviceAuth() {
+  const wails = useWails()
   const location = useLocation()
   const navigate = useNavigate()
+  const actionData = useActionData() as AwsIamIdcDeviceAuthFlowResult | undefined
+
+  const authFlowState = useRef(location.state)
+
+  if (
+    authFlowState.current.verificationUriComplete !==
+    location.state.verificationUriComplete
+  ) {
+    authFlowState.current = location.state
+  }
 
   const {
     action,
@@ -13,7 +30,32 @@ export function AwsIamIdcDeviceAuth() {
     awsRegion,
     userCode,
     deviceCode,
-  } = location.state
+  } = authFlowState.current
+
+  useEffect(() => {
+    if (!actionData) {
+      return
+    }
+
+    if (actionData.success === true) {
+      return navigate("/")
+    }
+
+    if (actionData.success === false) {
+      switch (actionData.code) {
+        case AwsIamIdcDeviceAuthFlowError.ErrDeviceAuthFlowNotAuthorized:
+          wails.runtime.ShowWarningDialog(
+            "You haven not authorized the device through the activation link :(\nPlease do so then click this button again",
+          )
+          return
+        case AwsIamIdcDeviceAuthFlowError.ErrDeviceAuthFlowTimedOut:
+          wails.runtime.ShowWarningDialog(
+            "The device authorization flow timed out and we have to start over",
+          )
+          return navigate("/")
+      }
+    }
+  }, [wails, navigate, actionData])
 
   return (
     <Form

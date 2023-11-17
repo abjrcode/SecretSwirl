@@ -48,3 +48,19 @@ func (app *AppController) Init(ctx context.Context) {
 	app.ctx = ctx
 	app.logger = zerolog.Ctx(ctx)
 }
+
+func (app *AppController) ShowErrorDialog(msg string) {
+	wailsRuntime.MessageDialog(app.ctx, wailsRuntime.MessageDialogOptions{
+		Type:    wailsRuntime.ErrorDialog,
+		Title:   "Error",
+		Message: msg,
+	})
+}
+
+func (app *AppController) ShowWarningDialog(msg string) {
+	wailsRuntime.MessageDialog(app.ctx, wailsRuntime.MessageDialogOptions{
+		Type:    wailsRuntime.WarningDialog,
+		Title:   "Warning",
+		Message: msg,
+	})
+}

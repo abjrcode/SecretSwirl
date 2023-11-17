@@ -303,7 +303,7 @@ func TestRefreshAccessToken(t *testing.T) {
 	startUrl := "https://test-start-url.aws-apps.com/start"
 	region := "eu-west-1"
 
-	controller, mockAws, _ := simulateSuccessfulSetup(t, startUrl, region)
+	controller, mockAws, mockTimeProvider := simulateSuccessfulSetup(t, startUrl, region)
 
 	mockAuthRes := awssso.AuthorizationResponse{
 		DeviceCode:              "test-device-code-2",
@@ -313,6 +313,7 @@ func TestRefreshAccessToken(t *testing.T) {
 	}
 	mockAws.On("StartDeviceAuthorization", mock.Anything, mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(&mockAuthRes, nil)
 
+	mockTimeProvider.On("NowUnix").Return(10)
 	refreshRes, err := controller.RefreshAccessToken(startUrl)
 	require.NoError(t, err)
 
@@ -369,6 +370,7 @@ func TestFinalizeRefreshAccessToken(t *testing.T) {
 	}
 	mockAws.On("StartDeviceAuthorization", mock.Anything, mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(&mockAuthRes, nil)
 
+	mockTimeProvider.On("NowUnix").Return(10)
 	refreshRes, err := controller.RefreshAccessToken(startUrl)
 	require.NoError(t, err)
 
@@ -384,5 +386,55 @@ func TestFinalizeRefreshAccessToken(t *testing.T) {
 	mockAws.On("CreateToken", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockTokenRes, nil)
 
 	err = controller.FinalizeRefreshAccessToken(refreshRes.ClientId, refreshRes.StartUrl, refreshRes.Region, refreshRes.UserCode, refreshRes.DeviceCode)
+	require.NoError(t, err)
+}
+
+func TestAwsClientExpires(t *testing.T) {
+	controller, mockAws, mockTimeProvider := initController(t)
+
+	mockRegRes := awssso.RegistrationResponse{
+		ClientId:     "test-client-id",
+		ClientSecret: "test-client-secret",
+		CreatedAt:    10,
+		ExpiresAt:    200,
+	}
+	regCall := mockAws.On("RegisterClient", mock.Anything, mock.Anything).Return(&mockRegRes, nil)
+
+	mockAuthRes := awssso.AuthorizationResponse{
+		DeviceCode:              "test-device-code",
+		UserCode:                "test-user-code",
+		VerificationUriComplete: "https://test-verification-url",
+		ExpiresIn:               5,
+	}
+	deviceAuthCall := mockAws.On("StartDeviceAuthorization", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockAuthRes, nil)
+
+	startUrl := "https://test-start-url.aws-apps.com/start"
+	region := "eu-west-1"
+
+	_, err := controller.Setup(startUrl, region)
+	require.NoError(t, err)
+
+	regCall.Unset()
+	deviceAuthCall.Unset()
+
+	mockTimeProvider.On("NowUnix").Return(int(mockRegRes.ExpiresAt + 1))
+
+	mockRegRes = awssso.RegistrationResponse{
+		ClientId:     "test-client-id-2",
+		ClientSecret: "test-client-secret-2",
+		CreatedAt:    201,
+		ExpiresAt:    400,
+	}
+	mockAws.On("RegisterClient", mock.Anything, mock.Anything).Return(&mockRegRes, nil)
+
+	mockAuthRes = awssso.AuthorizationResponse{
+		DeviceCode:              "test-device-code-2",
+		UserCode:                "test-user-code-2",
+		VerificationUriComplete: "https://test-verification-url-2",
+		ExpiresIn:               10,
+	}
+	mockAws.On("StartDeviceAuthorization", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockAuthRes, nil)
+
+	_, err = controller.Setup(startUrl, region)
 	require.NoError(t, err)
 }
