@@ -10,9 +10,11 @@ import (
 	"errors"
 	"io"
 
+	"github.com/abjrcode/swervo/internal/logging"
 	"github.com/abjrcode/swervo/internal/security/encryption"
 	"github.com/abjrcode/swervo/internal/utils"
 	"github.com/awnumar/memguard"
+	"github.com/rs/zerolog"
 )
 
 var (
@@ -23,7 +25,7 @@ var (
 
 type Vault interface {
 	// IsSetup returns true if the vault is configured with a key, false otherwise.
-	IsSetup(ctx context.Context) (bool, error)
+	IsSetup(ctx context.Context) bool
 
 	// ConfigureKey configures the vault with a key derived from the given plainPassword.
 	ConfigureKey(ctx context.Context, plainPassword string) error
@@ -46,20 +48,24 @@ type Vault interface {
 type vaultImpl struct {
 	timeSvc       utils.Datetime
 	db            *sql.DB
+	logger        *zerolog.Logger
+	errHandler    logging.ErrorHandler
 	keyId         *string
 	encryptionKey *memguard.Enclave
 }
 
-func NewVault(db *sql.DB, timeSvc utils.Datetime) Vault {
+func NewVault(db *sql.DB, timeSvc utils.Datetime, logger *zerolog.Logger, errHandler logging.ErrorHandler) Vault {
 	memguard.CatchInterrupt()
 
 	return &vaultImpl{
-		timeSvc: timeSvc,
-		db:      db,
+		timeSvc:    timeSvc,
+		db:         db,
+		logger:     logger,
+		errHandler: errHandler,
 	}
 }
 
-func (v *vaultImpl) IsSetup(ctx context.Context) (bool, error) {
+func (v *vaultImpl) IsSetup(ctx context.Context) bool {
 	row := v.db.QueryRowContext(ctx, `SELECT "key_id" FROM "argon_key_material";`)
 
 	var keyId string
@@ -68,21 +74,17 @@ func (v *vaultImpl) IsSetup(ctx context.Context) (bool, error) {
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return false, nil
+			return false
 		}
 
-		return false, err
+		v.errHandler.Catch(v.logger, err)
 	}
 
-	return true, nil
+	return true
 }
 
 func (v *vaultImpl) ConfigureKey(ctx context.Context, plainPassword string) error {
-	configured, err := v.IsSetup(ctx)
-
-	if err != nil {
-		return err
-	}
+	configured := v.IsSetup(ctx)
 
 	if configured {
 		return ErrVaultAlreadyConfigured
@@ -92,9 +94,7 @@ func (v *vaultImpl) ConfigureKey(ctx context.Context, plainPassword string) erro
 
 	derivedKey, salt, err := generateFromPassword(plainPassword, DefaultParameters)
 
-	if err != nil {
-		return err
-	}
+	v.errHandler.Catch(v.logger, err)
 
 	saltBase64 := base64.RawStdEncoding.EncodeToString(salt)
 
@@ -132,9 +132,7 @@ func (v *vaultImpl) ConfigureKey(ctx context.Context, plainPassword string) erro
 		DefaultParameters.SaltLength, saltBase64,
 		DefaultParameters.KeyLength)
 
-	if err != nil {
-		return err
-	}
+	v.errHandler.Catch(v.logger, err)
 
 	v.keyId = &keyId
 	v.encryptionKey = memguard.NewEnclave(derivedKey)
@@ -175,15 +173,11 @@ func (v *vaultImpl) Open(ctx context.Context, plainPassword string) (bool, error
 
 	salt, err := base64.RawStdEncoding.DecodeString(saltBase64)
 
-	if err != nil {
-		return false, err
-	}
+	v.errHandler.Catch(v.logger, err)
 
 	match, derivedKey, err := comparePasswordAndHash(plainPassword, salt, []byte(keyHash), &params)
 
-	if err != nil {
-		return false, err
-	}
+	v.errHandler.Catch(v.logger, err)
 
 	if match {
 		v.keyId = &keyId
@@ -209,20 +203,14 @@ func (v *vaultImpl) EncryptBinary(plaintext []byte) ([]byte, string, error) {
 	}
 
 	key, err := v.encryptionKey.Open()
-	if err != nil {
-		return nil, "", err
-	}
+	v.errHandler.Catch(v.logger, err)
 	defer key.Destroy()
 
 	aesBlock, err := aes.NewCipher(key.Bytes())
-	if err != nil {
-		return nil, "", err
-	}
+	v.errHandler.Catch(v.logger, err)
 
 	gcmInstance, err := cipher.NewGCM(aesBlock)
-	if err != nil {
-		return nil, "", err
-	}
+	v.errHandler.Catch(v.logger, err)
 
 	nonce := make([]byte, gcmInstance.NonceSize())
 	_, _ = io.ReadFull(rand.Reader, nonce)
@@ -244,27 +232,19 @@ func (v *vaultImpl) DecryptBinary(ciphertext []byte, keyId string) ([]byte, erro
 	}
 
 	key, err := v.encryptionKey.Open()
-	if err != nil {
-		return nil, err
-	}
+	v.errHandler.Catch(v.logger, err)
 	defer key.Destroy()
 
 	aesBlock, err := aes.NewCipher(key.Bytes())
-	if err != nil {
-		return nil, err
-	}
+	v.errHandler.Catch(v.logger, err)
 	gcmInstance, err := cipher.NewGCM(aesBlock)
-	if err != nil {
-		return nil, err
-	}
+	v.errHandler.Catch(v.logger, err)
 
 	nonceSize := gcmInstance.NonceSize()
 	nonce, encryptedText := ciphertext[:nonceSize], ciphertext[nonceSize:]
 
 	plaintext, err := gcmInstance.Open(nil, nonce, encryptedText, nil)
-	if err != nil {
-		return nil, err
-	}
+	v.errHandler.Catch(v.logger, err)
 
 	return plaintext, nil
 }
@@ -276,9 +256,7 @@ func (v *vaultImpl) Encrypt(plaintext string) (string, string, error) {
 
 	ciphertext, keyId, err := v.EncryptBinary([]byte(plaintext))
 
-	if err != nil {
-		return "", "", err
-	}
+	v.errHandler.Catch(v.logger, err)
 
 	return string(ciphertext), keyId, nil
 }
@@ -291,7 +269,11 @@ func (v *vaultImpl) Decrypt(ciphertext string, keyId string) (string, error) {
 	plaintext, err := v.DecryptBinary([]byte(ciphertext), keyId)
 
 	if err != nil {
-		return "", err
+		if errors.Is(err, ErrVaultNotConfiguredOrSealed) {
+			return "", err
+		}
+
+		v.errHandler.Catch(v.logger, err)
 	}
 
 	return string(plaintext), nil
