@@ -23,6 +23,7 @@ var (
 	ErrDeviceAuthFlowTimedOut      = errors.New("DEVICE_AUTH_FLOW_TIMED_OUT")
 	ErrAccessTokenExpired          = errors.New("ACCESS_TOKEN_EXPIRED")
 	ErrInstanceAlreadyRegistered   = errors.New("INSTANCE_ALREADY_REGISTERED")
+	ErrTransientAwsClientError     = errors.New("TRANSIENT_AWS_CLIENT_ERROR")
 )
 
 type AwsIdentityCenterController struct {
@@ -46,7 +47,8 @@ func NewAwsIdentityCenterController(db *sql.DB, encryptionService encryption.Enc
 
 func (controller *AwsIdentityCenterController) Init(ctx context.Context, errorHandler logging.ErrorHandler) {
 	controller.ctx = ctx
-	controller.logger = zerolog.Ctx(ctx)
+	enrichedLogger := zerolog.Ctx(ctx).With().Str("component", "aws_idc_controller").Logger()
+	controller.logger = &enrichedLogger
 	controller.errHandler = errorHandler
 }
 
@@ -97,7 +99,9 @@ func (c *AwsIdentityCenterController) GetInstanceData(startUrl string) (*AwsIden
 			return nil, ErrAccessTokenExpired
 		}
 
-		c.errHandler.CatchWithMsg(c.logger, err, "failed to list accounts")
+		c.logger.Error().Err(err).Msg("aws sso client failed to list accounts")
+
+		return nil, ErrTransientAwsClientError
 	}
 
 	accounts := make([]AwsIdentityCenterAccount, 0)
@@ -157,15 +161,20 @@ func (c *AwsIdentityCenterController) Setup(startUrlStr, awsRegion string) (*Aut
 	regRes, err := c.getOrRegisterClient(ctx)
 
 	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to register client")
-		return nil, err
+		c.logger.Error().Err(err).Msg("failed to get or register client")
+		return nil, ErrTransientAwsClientError
 	}
 
 	authorizeRes, err := c.authorizeDevice(ctx, startUrl, regRes.ClientId, regRes.ClientSecret)
 
 	if err != nil {
+		if errors.Is(err, awssso.ErrInvalidStartUrl) {
+			c.logger.Debug().Err(err).Msg("failed to authorize device because start URL is invalid")
+			return nil, ErrInvalidStartUrl
+		}
+
 		c.logger.Error().Err(err).Msg("failed to authorize device")
-		return nil, err
+		return nil, ErrTransientAwsClientError
 	}
 
 	return &AuthorizeDeviceFlowResult{
@@ -207,7 +216,8 @@ func (c *AwsIdentityCenterController) FinalizeSetup(clientId, startUrl, region, 
 			return ErrDeviceAuthFlowTimedOut
 		}
 
-		c.errHandler.CatchWithMsg(c.logger, err, "failed to get token")
+		c.logger.Error().Err(err).Msg("failed to get token")
+		return ErrTransientAwsClientError
 	}
 
 	tx, err := c.db.BeginTx(ctx, nil)
@@ -267,7 +277,7 @@ func (c *AwsIdentityCenterController) RefreshAccessToken(startUrlStr string) (*A
 
 	if err != nil {
 		c.logger.Debug().Err(err).Msg("failed to parse start URL")
-		return nil, err
+		return nil, ErrInvalidStartUrl
 	}
 
 	var awsRegion string
@@ -284,14 +294,19 @@ func (c *AwsIdentityCenterController) RefreshAccessToken(startUrlStr string) (*A
 
 	if err != nil {
 		c.logger.Error().Err(err).Msg("failed to get or register client")
-		return nil, err
+		return nil, ErrTransientAwsClientError
 	}
 
 	authorizeRes, err := c.authorizeDevice(ctx, startUrl, regRes.ClientId, regRes.ClientSecret)
 
 	if err != nil {
+		if errors.Is(err, awssso.ErrInvalidStartUrl) {
+			c.logger.Debug().Err(err).Msg("failed to authorize device because start URL is invalid")
+			return nil, ErrInvalidStartUrl
+		}
+
 		c.logger.Error().Err(err).Msg("failed to authorize device")
-		return nil, err
+		return nil, ErrTransientAwsClientError
 	}
 
 	return &AuthorizeDeviceFlowResult{
@@ -334,7 +349,7 @@ func (c *AwsIdentityCenterController) FinalizeRefreshAccessToken(clientId, start
 		}
 
 		c.logger.Error().Err(err).Msg("failed to get token")
-		return err
+		return ErrTransientAwsClientError
 	}
 
 	idTokenEnc, keyId, err := c.encryptionService.Encrypt(tokenRes.IdToken)

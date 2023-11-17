@@ -1,10 +1,12 @@
 import { Form, useActionData, useNavigate } from "react-router-dom"
 import { useEffect } from "react"
 import { useWails } from "../../wails-provider/wails-context"
-import { AwsIamIdcSetupResult } from "./aws-iam-idc-setup-data"
+import { AwsIamIdcSetupError, AwsIamIdcSetupResult } from "./aws-iam-idc-setup-data"
+import { useToaster } from "../../toast-provider/toast-context"
 
 export function AwsIamIdcSetup() {
   const wails = useWails()
+  const toaster = useToaster()
   const navigate = useNavigate()
 
   const startUrl = "https://my-app.awsapps.com/start"
@@ -28,10 +30,27 @@ export function AwsIamIdcSetup() {
           },
         })
       } else {
-        wails.runtime.ShowErrorDialog(setupResult.error)
+        switch (setupResult.code) {
+          case AwsIamIdcSetupError.ErrInvalidStartUrl:
+            toaster.showError("The Start URL is not valid")
+            break
+          case AwsIamIdcSetupError.ErrInvalidAwsRegion:
+            toaster.showError("The AWS region is not valid")
+            break
+          case AwsIamIdcSetupError.ErrInstanceAlreadyRegistered:
+            wails.runtime.ShowWarningDialog(
+              "Start URL and Region combination are already registered",
+            )
+            break
+          case AwsIamIdcSetupError.ErrTransientAwsClientError:
+            toaster.showWarning(
+              "There was an error, but it might work if you try again a bit later",
+            )
+            break
+        }
       }
     }
-  }, [navigate, setupResult, wails])
+  }, [navigate, setupResult, wails, toaster])
 
   return (
     <Form
