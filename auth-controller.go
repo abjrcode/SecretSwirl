@@ -15,9 +15,16 @@ type AuthController struct {
 	vault        vault.Vault
 }
 
+func NewAuthController(vault vault.Vault) *AuthController {
+	return &AuthController{
+		vault: vault,
+	}
+}
+
 func (c *AuthController) Init(ctx context.Context, errorHandler logging.ErrorHandler) {
 	c.ctx = ctx
-	c.logger = zerolog.Ctx(ctx)
+	enrichedLogger := zerolog.Ctx(ctx).With().Str("component", "auth_controller").Logger()
+	c.logger = &enrichedLogger
 	c.errorHandler = errorHandler
 }
 

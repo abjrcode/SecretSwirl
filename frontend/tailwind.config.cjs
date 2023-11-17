@@ -26,6 +26,7 @@ module.exports = {
       "dracula",
       "lemonade",
     ],
+    logs: false,
   },
   darkMode: "media",
   theme: {

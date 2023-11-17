@@ -33,10 +33,15 @@ func New(migrationsFsys fs.FS, migrationsPath string, appStore *datastore.AppSto
 		return nil, err
 	}
 
+	enrichedLogger := logger.
+		With().
+		Str("component", "migrations_runner").
+		Logger()
+
 	return &MigrationRunner{
 		migrationSource: &migrationsSrc,
 		appStore:        appStore,
-		logger:          &logger,
+		logger:          &enrichedLogger,
 		errHandler:      errHandler,
 	}, nil
 }

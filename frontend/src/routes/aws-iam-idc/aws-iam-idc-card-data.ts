@@ -1,6 +1,15 @@
 import { GetInstanceData } from '../../../wailsjs/go/awsiamidc/AwsIdentityCenterController'
+import { awsiamidc } from '../../../wailsjs/go/models'
+import { ActionDataResult } from '../../components/action-data-result'
 
-export async function awsIamIdcCardLoader({ request }: { request: Request }) {
+export enum AwsIamIdcCardDataError {
+  ErrAccessTokenExpired = "ACCESS_TOKEN_EXPIRED",
+  ErrTransientAwsClientError = "TRANSIENT_AWS_CLIENT_ERROR",
+}
+
+export type AwsIamIdcCardDataResult = ActionDataResult<awsiamidc.AwsIdentityCenterCardData, AwsIamIdcCardDataError>
+
+export async function awsIamIdcCardLoader({ request }: { request: Request }): Promise<AwsIamIdcCardDataResult> {
   const instanceId = new URL(request.url).searchParams.get('instanceId')
 
   if (!instanceId) {
@@ -8,15 +17,16 @@ export async function awsIamIdcCardLoader({ request }: { request: Request }) {
   }
 
   try {
-    return await GetInstanceData(instanceId)
+    return { success: true, result: await GetInstanceData(instanceId) }
   }
   catch (error) {
-    if (error === "ACCESS_TOKEN_EXPIRED"
-      || error === "CLIENT_EXPIRED"
-      || error === "CLIENT_ALREADY_REGISTERED") {
-      return error
+    switch (error) {
+      case AwsIamIdcCardDataError.ErrAccessTokenExpired:
+        return { success: false, code: AwsIamIdcCardDataError.ErrAccessTokenExpired, error: error }
+      case AwsIamIdcCardDataError.ErrTransientAwsClientError:
+        return { success: false, code: AwsIamIdcCardDataError.ErrTransientAwsClientError, error: error }
+      default:
+        throw error
     }
-
-    throw error
   }
 }
