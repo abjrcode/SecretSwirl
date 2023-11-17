@@ -1,18 +1,16 @@
 import { ActionFunctionArgs } from "react-router-dom"
 import { FinalizeRefreshAccessToken, FinalizeSetup } from "../../../wailsjs/go/awsiamidc/AwsIdentityCenterController"
+import { ActionDataResult } from "../../components/action-data-result"
 
 export enum AwsIamIdcDeviceAuthFlowError {
   ErrDeviceAuthFlowNotAuthorized = "DEVICE_AUTH_FLOW_NOT_AUTHORIZED",
-  ErrDeviceAuthFlowTimedOut = "DEVICE_AUTH_FLOW_TIMED_OUT"
+  ErrDeviceAuthFlowTimedOut = "DEVICE_AUTH_FLOW_TIMED_OUT",
+  ErrInvalidStartUrl = "INVALID_START_URL",
+  ErrInvalidAwsRegion = "INVALID_AWS_REGION",
+  ErrTransientAwsClientError = "TRANSIENT_AWS_CLIENT_ERROR",
 }
 
-export type AwsIamIdcDeviceAuthFlowResult = {
-  success: true
-} | {
-  success: false
-  code: AwsIamIdcDeviceAuthFlowError
-  actualError: unknown
-}
+export type AwsIamIdcDeviceAuthFlowResult = ActionDataResult<null, AwsIamIdcDeviceAuthFlowError>
 
 export async function awsIamIdcDeviceAuthAction({ request }: ActionFunctionArgs): Promise<AwsIamIdcDeviceAuthFlowResult> {
   const formData = await request.formData()
@@ -39,13 +37,19 @@ export async function awsIamIdcDeviceAuthAction({ request }: ActionFunctionArgs)
   } catch (e) {
     switch (e) {
       case AwsIamIdcDeviceAuthFlowError.ErrDeviceAuthFlowNotAuthorized:
-        return { success: false, code: AwsIamIdcDeviceAuthFlowError.ErrDeviceAuthFlowNotAuthorized, actualError: e }
+        return { success: false, code: AwsIamIdcDeviceAuthFlowError.ErrDeviceAuthFlowNotAuthorized, error: e }
       case AwsIamIdcDeviceAuthFlowError.ErrDeviceAuthFlowTimedOut:
-        return { success: false, code: AwsIamIdcDeviceAuthFlowError.ErrDeviceAuthFlowTimedOut, actualError: e }
+        return { success: false, code: AwsIamIdcDeviceAuthFlowError.ErrDeviceAuthFlowTimedOut, error: e }
+      case AwsIamIdcDeviceAuthFlowError.ErrInvalidStartUrl:
+        return { success: false, code: AwsIamIdcDeviceAuthFlowError.ErrInvalidStartUrl, error: e }
+      case AwsIamIdcDeviceAuthFlowError.ErrInvalidAwsRegion:
+        return { success: false, code: AwsIamIdcDeviceAuthFlowError.ErrInvalidAwsRegion, error: e }
+      case AwsIamIdcDeviceAuthFlowError.ErrTransientAwsClientError:
+        return { success: false, code: AwsIamIdcDeviceAuthFlowError.ErrTransientAwsClientError, error: e }
       default:
         throw e
     }
   }
 
-  return { success: true }
+  return { success: true, result: null }
 }
