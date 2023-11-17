@@ -1,7 +1,20 @@
-import { ActionFunctionArgs, redirect } from "react-router-dom"
+import { ActionFunctionArgs } from "react-router-dom"
 import { FinalizeRefreshAccessToken, FinalizeSetup } from "../../../wailsjs/go/awsiamidc/AwsIdentityCenterController"
 
-export async function awsIamIdcDeviceAuthAction({ request }: ActionFunctionArgs) {
+export enum AwsIamIdcDeviceAuthFlowError {
+  ErrDeviceAuthFlowNotAuthorized = "DEVICE_AUTH_FLOW_NOT_AUTHORIZED",
+  ErrDeviceAuthFlowTimedOut = "DEVICE_AUTH_FLOW_TIMED_OUT"
+}
+
+export type AwsIamIdcDeviceAuthFlowResult = {
+  success: true
+} | {
+  success: false
+  code: AwsIamIdcDeviceAuthFlowError
+  actualError: unknown
+}
+
+export async function awsIamIdcDeviceAuthAction({ request }: ActionFunctionArgs): Promise<AwsIamIdcDeviceAuthFlowResult> {
   const formData = await request.formData()
   const updates = Object.fromEntries(formData)
 
@@ -25,12 +38,14 @@ export async function awsIamIdcDeviceAuthAction({ request }: ActionFunctionArgs)
     }
   } catch (e) {
     switch (e) {
-      case "DEVICE_AUTH_FLOW_TIMED_OUT":
-        return redirect("new")
+      case AwsIamIdcDeviceAuthFlowError.ErrDeviceAuthFlowNotAuthorized:
+        return { success: false, code: AwsIamIdcDeviceAuthFlowError.ErrDeviceAuthFlowNotAuthorized, actualError: e }
+      case AwsIamIdcDeviceAuthFlowError.ErrDeviceAuthFlowTimedOut:
+        return { success: false, code: AwsIamIdcDeviceAuthFlowError.ErrDeviceAuthFlowTimedOut, actualError: e }
       default:
         throw e
     }
   }
 
-  return redirect("/")
+  return { success: true }
 }

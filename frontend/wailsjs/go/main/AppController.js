@@ -5,3 +5,11 @@
 export function Init(arg1) {
   return window['go']['main']['AppController']['Init'](arg1);
 }
+
+export function ShowErrorDialog(arg1) {
+  return window['go']['main']['AppController']['ShowErrorDialog'](arg1);
+}
+
+export function ShowWarningDialog(arg1) {
+  return window['go']['main']['AppController']['ShowWarningDialog'](arg1);
+}
