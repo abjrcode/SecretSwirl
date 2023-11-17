@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/abjrcode/swervo/internal/datastore"
+	"github.com/abjrcode/swervo/internal/testhelpers"
 	"github.com/rs/zerolog"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
@@ -28,7 +29,7 @@ func TestNew(t *testing.T) {
 		MemFs: memFs,
 	}
 
-	runner, err := New(mockFs, "migrations", nil, zerolog.Logger{})
+	runner, err := New(mockFs, "migrations", nil, zerolog.Logger{}, testhelpers.NewMockErrorHandler(t))
 
 	require.NoError(t, err)
 	require.NotNil(t, runner)
@@ -39,7 +40,7 @@ func TestNewInvalidMigrationsPath(t *testing.T) {
 		MemFs: afero.NewMemMapFs(),
 	}
 
-	_, err := New(mockFs, "invalid-migrations-path", nil, zerolog.Logger{})
+	_, err := New(mockFs, "invalid-migrations-path", nil, zerolog.Logger{}, testhelpers.NewMockErrorHandler(t))
 
 	require.Error(t, err)
 }
@@ -59,7 +60,7 @@ func TestRunIfNecessary(t *testing.T) {
 	}
 
 	dataStore := datastore.New(dir, "test.db")
-	runner, err := New(mockFs, "/migrations", dataStore, zerolog.Logger{})
+	runner, err := New(mockFs, "/migrations", dataStore, zerolog.Logger{}, testhelpers.NewMockErrorHandler(t))
 
 	require.NoError(t, err)
 	require.NotNil(t, runner)
@@ -94,7 +95,7 @@ func TestRunIfNecessaryNoMigrationsNeeded(t *testing.T) {
 	}
 
 	dataStore := datastore.New(dir, "test.db")
-	runner, err := New(mockFs, "/migrations", dataStore, zerolog.Logger{})
+	runner, err := New(mockFs, "/migrations", dataStore, zerolog.Logger{}, testhelpers.NewMockErrorHandler(t))
 
 	require.NoError(t, err)
 	require.NotNil(t, runner)
@@ -118,7 +119,7 @@ func TestRunIfNecessaryFailedMigration(t *testing.T) {
 	}
 
 	dataStore := datastore.NewInMemory("test.db")
-	runner, err := New(mockFs, "/migrations", dataStore, zerolog.Logger{})
+	runner, err := New(mockFs, "/migrations", dataStore, zerolog.Logger{}, testhelpers.NewMockErrorHandler(t))
 
 	require.NoError(t, err)
 	require.NotNil(t, runner)
@@ -146,7 +147,7 @@ func TestRunIfNecessaryFailedMigrationRestoresDatabase(t *testing.T) {
 	require.Error(t, err)
 	db.Close()
 
-	runner, err := New(mockFs, "/migrations", dataStore, zerolog.Logger{})
+	runner, err := New(mockFs, "/migrations", dataStore, zerolog.Logger{}, testhelpers.NewMockErrorHandler(t))
 
 	require.NoError(t, err)
 	require.NotNil(t, runner)
@@ -172,7 +173,7 @@ func TestRunIfNecessaryFailedMigrationRestoresDatabase(t *testing.T) {
 		MemFs: memFs,
 	}
 
-	runner, err = New(mockFs, "/migrations", dataStore, zerolog.Logger{})
+	runner, err = New(mockFs, "/migrations", dataStore, zerolog.Logger{}, testhelpers.NewMockErrorHandler(t))
 	require.NoError(t, err)
 
 	err = runner.RunSafe()

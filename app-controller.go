@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"runtime"
 
+	"github.com/abjrcode/swervo/internal/logging"
 	"github.com/rs/zerolog"
 	"github.com/wailsapp/wails/v2/pkg/menu"
 	"github.com/wailsapp/wails/v2/pkg/menu/keys"
@@ -12,9 +14,10 @@ import (
 )
 
 type AppController struct {
-	ctx      context.Context
-	mainMenu *menu.Menu
-	logger   *zerolog.Logger
+	ctx          context.Context
+	mainMenu     *menu.Menu
+	logger       *zerolog.Logger
+	errorHandler logging.ErrorHandler
 }
 
 func NewAppController() *AppController {
@@ -44,9 +47,10 @@ func NewAppController() *AppController {
 	return controller
 }
 
-func (app *AppController) Init(ctx context.Context) {
+func (app *AppController) Init(ctx context.Context, errorHandler logging.ErrorHandler) {
 	app.ctx = ctx
 	app.logger = zerolog.Ctx(ctx)
+	app.errorHandler = errorHandler
 }
 
 func (app *AppController) ShowErrorDialog(msg string) {
@@ -63,4 +67,8 @@ func (app *AppController) ShowWarningDialog(msg string) {
 		Title:   "Warning",
 		Message: msg,
 	})
+}
+
+func (app *AppController) CatchUnhandledError(msg string) {
+	app.errorHandler.Catch(app.logger, errors.New(msg))
 }

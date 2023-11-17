@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/abjrcode/swervo/clients/awssso"
+	"github.com/abjrcode/swervo/internal/logging"
 	"github.com/abjrcode/swervo/internal/security/encryption"
 	"github.com/abjrcode/swervo/internal/utils"
 	"github.com/dustin/go-humanize"
@@ -27,6 +28,7 @@ var (
 type AwsIdentityCenterController struct {
 	ctx               context.Context
 	logger            *zerolog.Logger
+	errHandler        logging.ErrorHandler
 	db                *sql.DB
 	encryptionService encryption.EncryptionService
 	awsSsoClient      awssso.AwsSsoOidcClient
@@ -42,9 +44,10 @@ func NewAwsIdentityCenterController(db *sql.DB, encryptionService encryption.Enc
 	}
 }
 
-func (controller *AwsIdentityCenterController) Init(ctx context.Context) {
+func (controller *AwsIdentityCenterController) Init(ctx context.Context, errorHandler logging.ErrorHandler) {
 	controller.ctx = ctx
 	controller.logger = zerolog.Ctx(ctx)
+	controller.errHandler = errorHandler
 }
 
 type AwsIdentityCenterAccount struct {
@@ -69,26 +72,22 @@ func (c *AwsIdentityCenterController) GetInstanceData(startUrl string) (*AwsIden
 
 	if err := row.Scan(&region, &accessTokenEnc, &accessTokenCreatedAt, &accessTokenExpiresIn, &encKeyId); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			c.logger.Debug().Msgf("no token found for start URL [%s]", startUrl)
-			return nil, nil
+			c.errHandler.CatchWithMsg(c.logger, err, fmt.Sprintf("no token found for Start URL [%s]", startUrl))
 		}
 
-		return nil, err
+		c.errHandler.Catch(c.logger, err)
 	}
 
 	now := c.timeHelper.NowUnix()
 	if now > accessTokenCreatedAt+accessTokenExpiresIn {
-		c.logger.Debug().Msgf("token for start URL [%s] is expired", startUrl)
+		c.logger.Info().Msgf("token for start URL [%s] has expired", startUrl)
 
 		return nil, ErrAccessTokenExpired
 	}
 
 	accessToken, err := c.encryptionService.Decrypt(accessTokenEnc, encKeyId)
 
-	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to decrypt access token")
-		return nil, err
-	}
+	c.errHandler.CatchWithMsg(c.logger, err, "failed to decrypt access token")
 
 	ctx := context.WithValue(c.ctx, awssso.AwsRegion("awsRegion"), region)
 	accountsOut, err := c.awsSsoClient.ListAccounts(ctx, accessToken)
@@ -98,8 +97,7 @@ func (c *AwsIdentityCenterController) GetInstanceData(startUrl string) (*AwsIden
 			return nil, ErrAccessTokenExpired
 		}
 
-		c.logger.Error().Err(err).Msg("failed to list accounts")
-		return nil, err
+		c.errHandler.CatchWithMsg(c.logger, err, "failed to list accounts")
 	}
 
 	accounts := make([]AwsIdentityCenterAccount, 0)
@@ -130,7 +128,7 @@ type AuthorizeDeviceFlowResult struct {
 
 func (c *AwsIdentityCenterController) Setup(startUrlStr, awsRegion string) (*AuthorizeDeviceFlowResult, error) {
 	if _, ok := awssso.SupportedAwsRegions[awsRegion]; !ok {
-		c.logger.Error().Msgf("unsupported AWS region [%s]", awsRegion)
+		c.logger.Debug().Msgf("unsupported AWS region [%s]", awsRegion)
 		return nil, ErrInvalidAwsRegion
 	}
 
@@ -138,25 +136,21 @@ func (c *AwsIdentityCenterController) Setup(startUrlStr, awsRegion string) (*Aut
 	startUrl, err := url.Parse(startUrlStr)
 
 	if startUrl.Scheme == "" || startUrl.Host == "" {
-		c.logger.Error().Msgf("invalid start URL [%s]", startUrlStr)
+		c.logger.Debug().Msgf("invalid start URL [%s]", startUrlStr)
 		return nil, ErrInvalidStartUrl
 	}
 
-	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to parse start URL")
-		return nil, err
-	}
+	c.errHandler.CatchWithMsg(c.logger, err, fmt.Sprintf("failed to parse start URL: [%s]", startUrlStr))
 
 	var exists bool
 	err = c.db.QueryRowContext(ctx, "SELECT 1 FROM aws_iam_idc_instances WHERE start_url = ?", startUrlStr).Scan(&exists)
 
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		c.logger.Error().Err(err).Msg("failed to check if instance exists")
-		return nil, err
+		c.errHandler.CatchWithMsg(c.logger, err, "failed to check if instance exists")
 	}
 
 	if exists {
-		c.logger.Error().Msgf("instance [%s] already exists", startUrlStr)
+		c.logger.Warn().Msgf("instance [%s] already exists", startUrlStr)
 		return nil, ErrInstanceAlreadyRegistered
 	}
 
@@ -192,59 +186,47 @@ func (c *AwsIdentityCenterController) FinalizeSetup(clientId, startUrl, region, 
 	var encKeyId string
 
 	if err := row.Scan(&clientSecretEnc, &encKeyId); err != nil {
-		return err
+		c.errHandler.Catch(c.logger, err)
 	}
 
 	clientSecret, err := c.encryptionService.Decrypt(clientSecretEnc, encKeyId)
 
-	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to decrypt client secret")
-		return err
-	}
+	c.errHandler.CatchWithMsg(c.logger, err, "failed to decrypt client secret")
 
 	ctx := context.WithValue(c.ctx, awssso.AwsRegion("awsRegion"), region)
 	tokenRes, err := c.getToken(ctx, clientId, clientSecret, deviceCode, userCode)
 
 	if err != nil {
 		if errors.Is(err, awssso.ErrDeviceFlowNotAuthorized) {
-			c.logger.Error().Err(err).Msg("failed to get token because user did not authorize device")
+			c.logger.Debug().Err(err).Msg("failed to get token because user did not authorize device")
 			return ErrDeviceAuthFlowNotAuthorized
 		}
 
 		if errors.Is(err, awssso.ErrDeviceCodeExpired) {
-			c.logger.Error().Err(err).Msg("failed to get token because user and device code expired")
+			c.logger.Debug().Err(err).Msg("failed to get token because user and device code expired")
 			return ErrDeviceAuthFlowTimedOut
 		}
-		c.logger.Error().Err(err).Msg("failed to get token")
-		return err
+
+		c.errHandler.CatchWithMsg(c.logger, err, "failed to get token")
 	}
 
 	tx, err := c.db.BeginTx(ctx, nil)
 
-	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to start transaction")
-		return err
-	}
+	c.errHandler.CatchWithMsg(c.logger, err, "failed to start transaction")
 
 	defer tx.Rollback()
 
 	idTokenEnc, keyId, err := c.encryptionService.Encrypt(tokenRes.IdToken)
-	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to encrypt id token")
-		return err
-	}
+
+	c.errHandler.CatchWithMsg(c.logger, err, "failed to encrypt id token")
 
 	accessTokenEnc, _, err := c.encryptionService.Encrypt(tokenRes.AccessToken)
-	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to encrypt access token")
-		return err
-	}
+
+	c.errHandler.CatchWithMsg(c.logger, err, "failed to encrypt access token")
 
 	refreshTokenEnc, _, err := c.encryptionService.Encrypt(tokenRes.RefreshToken)
-	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to encrypt refresh token")
-		return err
-	}
+
+	c.errHandler.CatchWithMsg(c.logger, err, "failed to encrypt refresh token")
 
 	sql := `INSERT INTO aws_iam_idc_instances
 	(start_url, region, enabled, id_token_enc, access_token_enc, token_type, access_token_created_at,
@@ -262,24 +244,15 @@ func (c *AwsIdentityCenterController) FinalizeSetup(clientId, startUrl, region, 
 		refreshTokenEnc,
 		keyId)
 
-	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to create token")
-		return err
-	}
+	c.errHandler.CatchWithMsg(c.logger, err, "failed to save token to database")
 
 	_, err = tx.ExecContext(ctx, `INSERT INTO providers (code, instance_id, display_name, is_favorite) VALUES (?, ?, ?, ?) `, "aws-iam-idc", startUrl, "AWS IAM Identity Center", true)
 
-	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to add provider to list of configured providers")
-		return err
-	}
+	c.errHandler.CatchWithMsg(c.logger, err, "failed to add provider to list of configured providers")
 
 	err = tx.Commit()
 
-	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to commit transaction")
-		return err
-	}
+	c.errHandler.CatchWithMsg(c.logger, err, "failed to commit transaction")
 
 	return nil
 }
@@ -288,12 +261,12 @@ func (c *AwsIdentityCenterController) RefreshAccessToken(startUrlStr string) (*A
 	startUrl, err := url.Parse(startUrlStr)
 
 	if startUrl.Scheme == "" || startUrl.Host == "" {
-		c.logger.Error().Msgf("invalid start URL [%s]", startUrlStr)
+		c.logger.Debug().Msgf("invalid start URL [%s]", startUrlStr)
 		return nil, ErrInvalidStartUrl
 	}
 
 	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to parse start URL")
+		c.logger.Debug().Err(err).Msg("failed to parse start URL")
 		return nil, err
 	}
 
@@ -302,9 +275,7 @@ func (c *AwsIdentityCenterController) RefreshAccessToken(startUrlStr string) (*A
 
 	if err := row.Scan(&awsRegion); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			c.logger.Debug().Msgf("no instance found for start URL [%s]", startUrlStr)
-			// TODO: probably should panic
-			return nil, errors.New("no instance found for start URL")
+			c.errHandler.CatchWithMsg(c.logger, err, fmt.Sprintf("no instance found for Start URL [%s]", startUrlStr))
 		}
 	}
 
@@ -341,27 +312,24 @@ func (c *AwsIdentityCenterController) FinalizeRefreshAccessToken(clientId, start
 	var encKeyId string
 
 	if err := row.Scan(&clientSecretEnc, &encKeyId); err != nil {
-		return err
+		c.errHandler.Catch(c.logger, err)
 	}
 
 	clientSecret, err := c.encryptionService.Decrypt(clientSecretEnc, encKeyId)
 
-	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to decrypt client secret")
-		return err
-	}
+	c.errHandler.CatchWithMsg(c.logger, err, "failed to decrypt client secret")
 
 	ctx := context.WithValue(c.ctx, awssso.AwsRegion("awsRegion"), region)
 	tokenRes, err := c.getToken(ctx, clientId, clientSecret, deviceCode, userCode)
 
 	if err != nil {
 		if errors.Is(err, awssso.ErrDeviceFlowNotAuthorized) {
-			c.logger.Error().Err(err).Msg("failed to get token because user did not authorize device")
+			c.logger.Debug().Err(err).Msg("failed to get token because user did not authorize device")
 			return ErrDeviceAuthFlowNotAuthorized
 		}
 
 		if errors.Is(err, awssso.ErrDeviceCodeExpired) {
-			c.logger.Error().Err(err).Msg("failed to get token because user and device code expired")
+			c.logger.Debug().Err(err).Msg("failed to get token because user and device code expired")
 			return ErrDeviceAuthFlowTimedOut
 		}
 
@@ -370,22 +338,16 @@ func (c *AwsIdentityCenterController) FinalizeRefreshAccessToken(clientId, start
 	}
 
 	idTokenEnc, keyId, err := c.encryptionService.Encrypt(tokenRes.IdToken)
-	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to encrypt id token")
-		return err
-	}
+
+	c.errHandler.CatchWithMsg(c.logger, err, "failed to encrypt id token")
 
 	accessTokenEnc, _, err := c.encryptionService.Encrypt(tokenRes.AccessToken)
-	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to encrypt access token")
-		return err
-	}
+
+	c.errHandler.CatchWithMsg(c.logger, err, "failed to encrypt access token")
 
 	refreshTokenEnc, _, err := c.encryptionService.Encrypt(tokenRes.RefreshToken)
-	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to encrypt refresh token")
-		return err
-	}
+
+	c.errHandler.CatchWithMsg(c.logger, err, "failed to encrypt refresh token")
 
 	sql := `UPDATE aws_iam_idc_instances SET
 		id_token_enc = ?,
@@ -405,10 +367,7 @@ func (c *AwsIdentityCenterController) FinalizeRefreshAccessToken(clientId, start
 		refreshTokenEnc,
 		keyId, startUrl)
 
-	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to refresh access token")
-		return err
-	}
+	c.errHandler.CatchWithMsg(c.logger, err, "failed to persist refreshed access token to database")
 
 	return nil
 }
@@ -425,7 +384,7 @@ func (c *AwsIdentityCenterController) getOrRegisterClient(ctx context.Context) (
 		if errors.Is(err, sql.ErrNoRows) {
 			shouldRegisterClient = true
 		} else {
-			return nil, err
+			c.errHandler.Catch(c.logger, err)
 		}
 	}
 
@@ -435,25 +394,20 @@ func (c *AwsIdentityCenterController) getOrRegisterClient(ctx context.Context) (
 
 		output, err := c.awsSsoClient.RegisterClient(ctx, friendlyClientName)
 		if err != nil {
+			c.logger.Error().Err(err).Msg("failed to register client")
 			return nil, err
 		}
 
 		clientSecretEnc, encKeyId, err := c.encryptionService.Encrypt(output.ClientSecret)
 
-		if err != nil {
-			c.logger.Error().Err(err).Msg("failed to encrypt client secret")
-			return nil, err
-		}
+		c.errHandler.CatchWithMsg(c.logger, err, "failed to encrypt client secret")
 
 		_, err = c.db.ExecContext(ctx, `INSERT INTO aws_iam_idc_clients
 			(client_id, client_secret_enc, created_at, expires_at, enc_key_id)
 			VALUES (?, ?, ?, ?, ?)`,
 			output.ClientId, clientSecretEnc, output.CreatedAt, output.ExpiresAt, encKeyId)
 
-		if err != nil {
-			c.logger.Error().Err(err).Msg("failed to insert client into database")
-			return nil, err
-		}
+		c.errHandler.CatchWithMsg(c.logger, err, "failed to save client to database")
 
 		c.logger.Info().Msgf("client [%s] registered successfully", friendlyClientName)
 
@@ -468,15 +422,13 @@ func (c *AwsIdentityCenterController) getOrRegisterClient(ctx context.Context) (
 
 		output, err := c.awsSsoClient.RegisterClient(ctx, friendlyClientName)
 		if err != nil {
+			c.logger.Error().Err(err).Msg("failed to register client")
 			return nil, err
 		}
 
 		clientSecretEnc, encKeyId, err := c.encryptionService.Encrypt(output.ClientSecret)
 
-		if err != nil {
-			c.logger.Error().Err(err).Msg("failed to encrypt client secret")
-			return nil, err
-		}
+		c.errHandler.CatchWithMsg(c.logger, err, "failed to encrypt client secret")
 
 		_, err = c.db.ExecContext(ctx, `UPDATE aws_iam_idc_clients SET
 			client_id = ?,
@@ -487,10 +439,7 @@ func (c *AwsIdentityCenterController) getOrRegisterClient(ctx context.Context) (
 			WHERE client_id = ?`,
 			output.ClientId, clientSecretEnc, output.CreatedAt, output.ExpiresAt, encKeyId, result.ClientId)
 
-		if err != nil {
-			c.logger.Error().Err(err).Msg("failed to update client in database")
-			return nil, err
-		}
+		c.errHandler.CatchWithMsg(c.logger, err, "failed to save client to database")
 
 		c.logger.Info().Msgf("client [%s] registered successfully", friendlyClientName)
 
@@ -499,10 +448,8 @@ func (c *AwsIdentityCenterController) getOrRegisterClient(ctx context.Context) (
 
 	var err error
 	result.ClientSecret, err = c.encryptionService.Decrypt(result.ClientSecret, encKeyId)
-	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to decrypt client secret")
-		return nil, err
-	}
+
+	c.errHandler.CatchWithMsg(c.logger, err, "failed to decrypt client secret")
 
 	return &result, nil
 }

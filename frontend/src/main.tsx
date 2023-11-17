@@ -19,7 +19,9 @@ import { AwsIamIdcDeviceAuth } from "./routes/aws-iam-idc/aws-iam-idc-device-aut
 import { awsIamIdcDeviceAuthAction } from "./routes/aws-iam-idc/aws-iam-idc-device-auth-data"
 import { ToastProvider } from "./toast-provider/toast-provider"
 
-if (import.meta.env.DEV) {
+const devMode = import.meta.env.DEV
+
+if (devMode) {
   document.documentElement.classList.add("debug-screens")
 }
 
@@ -27,7 +29,7 @@ void (async function main() {
   const router = createHashRouter([
     {
       element: <Vault isVaultConfigured={await IsVaultConfigured()} />,
-      errorElement: <ErrorPage />,
+      errorElement: <ErrorPage devMode />,
       children: [
         {
           path: "/",
