@@ -14,8 +14,10 @@ export type ToastOptions = {
   duration: number;
 }
 
+export type ToastContainer = (toasts: React.ReactElement[]) => void
+
 type ToastContext = {
-  toasts: readonly React.ReactElement<ToastSpec>[];
+  iRenderToasts(fn: ToastContainer): void;
   showInfo(opts: string | ToastOptions): void;
   showSuccess(opts: string | ToastOptions): void;
   showWarning(opts: string | ToastOptions): void;
