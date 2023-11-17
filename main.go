@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"errors"
 	"io"
 	"log"
 	"os"
@@ -64,7 +65,9 @@ func main() {
 		defer file.Close()
 	}
 
-	logger := logging.InitLogger(logFile)
+	logger := logging.InitLogger(logFile, Version, CommitSha)
+
+	errorHandler := logging.NewErrorHandler()
 
 	logger.Info().Msgf("Swervo version: %s, commit SHA: %s", Version, CommitSha)
 	logger.Info().Msgf("app data directory: [%s]", appDataDir)
@@ -73,29 +76,24 @@ func main() {
 
 	if !generateBindingsRun {
 		dataStore := datastore.New(appDataDir, "swervo.db")
-		migrationRunner, err := migrations.New(migrations.DefaultMigrationsFs, "scripts", dataStore, logger)
+		migrationRunner, err := migrations.New(migrations.DefaultMigrationsFs, "scripts", dataStore, logger, errorHandler)
 
-		if err != nil {
-			logger.Fatal().Err(err).Msg("could not read migrations from embedded filesystem")
-		}
+		errorHandler.CatchWithMsg(&logger, err, "could not read migrations from embedded filesystem")
 
 		if err := migrationRunner.RunSafe(); err != nil {
-			// TODO: report it!
-			logger.Error().Err(err).Msg("migrations run failed")
+			errorHandler.CatchWithMsg(&logger, err, "error when running migrations")
 		}
 
 		sqlDb, err = dataStore.Open()
 
-		if err != nil {
-			logger.Fatal().Err(err).Msg("could not open database")
-		}
+		errorHandler.CatchWithMsg(&logger, err, "could not open database")
 
 		defer sqlDb.Close()
 	}
 
 	appController := NewAppController()
 	timeProvider := utils.NewDatetime()
-	vault := vault.NewVault(sqlDb, timeProvider)
+	vault := vault.NewVault(sqlDb, timeProvider, &logger, errorHandler)
 	defer vault.Close()
 
 	authController := &AuthController{
@@ -119,10 +117,12 @@ func main() {
 			Assets: assets,
 		},
 		OnStartup: func(ctx context.Context) {
-			appController.Init(logger.WithContext(ctx))
-			authController.Init(logger.WithContext(ctx))
-			dashboardController.Init(logger.WithContext(ctx))
-			awsIdcController.Init(logger.WithContext(ctx))
+			errorHandler.InitWailsContext(&ctx)
+
+			appController.Init(logger.WithContext(ctx), errorHandler)
+			authController.Init(logger.WithContext(ctx), errorHandler)
+			dashboardController.Init(logger.WithContext(ctx), errorHandler)
+			awsIdcController.Init(logger.WithContext(ctx), errorHandler)
 		},
 		Bind: []interface{}{
 			appController,
@@ -131,6 +131,6 @@ func main() {
 			awsIdcController,
 		},
 	}); err != nil {
-		logger.Fatal().Err(err).Msg("Could not run Wails app")
+		errorHandler.Catch(&logger, errors.New("failed to launch Swervo"))
 	}
 }

@@ -1,16 +1,17 @@
-package testhelpers
+package migrations
 
 import (
 	"database/sql"
 	"fmt"
+	"testing"
 
 	"github.com/abjrcode/swervo/internal/datastore"
-	"github.com/abjrcode/swervo/internal/migrations"
+	"github.com/abjrcode/swervo/internal/testhelpers"
 	"github.com/abjrcode/swervo/internal/utils"
 	"github.com/rs/zerolog"
 )
 
-func NewInMemoryMigratedDatabase(dbName string) (*sql.DB, error) {
+func NewInMemoryMigratedDatabase(t *testing.T, dbName string) (*sql.DB, error) {
 	dbNameSuffix := utils.RandomString(4)
 	store := datastore.NewInMemory(fmt.Sprintf("%s_%s.db", dbName, dbNameSuffix))
 
@@ -24,7 +25,7 @@ func NewInMemoryMigratedDatabase(dbName string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	migrationRunner, err := migrations.New(migrations.DefaultMigrationsFs, "scripts", store, zerolog.Nop())
+	migrationRunner, err := New(DefaultMigrationsFs, "scripts", store, zerolog.Nop(), testhelpers.NewMockErrorHandler(t))
 
 	if err != nil {
 		return nil, err

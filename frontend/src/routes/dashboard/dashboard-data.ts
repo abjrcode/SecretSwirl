@@ -1,4 +1,5 @@
-import { ListFavorites } from "../../../wailsjs/go/main/DashboardController"
+// import { ListFavorites } from "../../../wailsjs/go/main/DashboardController"
 export async function dashboardLoader() {
-  return ListFavorites()
+  throw new Error("dashboardLoader() is not implemented")
+  // return ListFavorites()
 }

@@ -6,8 +6,8 @@ export function ConfigureVault(arg1) {
   return window['go']['main']['AuthController']['ConfigureVault'](arg1);
 }
 
-export function Init(arg1) {
-  return window['go']['main']['AuthController']['Init'](arg1);
+export function Init(arg1, arg2) {
+  return window['go']['main']['AuthController']['Init'](arg1, arg2);
 }
 
 export function IsVaultConfigured() {
