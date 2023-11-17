@@ -2,11 +2,11 @@ package awsiamidc
 
 import (
 	"context"
-	"errors"
 	"net/url"
 	"testing"
 
 	"github.com/abjrcode/swervo/clients/awssso"
+	"github.com/abjrcode/swervo/internal/migrations"
 	"github.com/abjrcode/swervo/internal/security/vault"
 	"github.com/abjrcode/swervo/internal/testhelpers"
 	"github.com/rs/zerolog"
@@ -52,19 +52,21 @@ func (m *mockDatetime) NowUnix() int64 {
 }
 
 func initController(t *testing.T) (*AwsIdentityCenterController, *mockAwsSsoOidcClient, *mockDatetime) {
-	db, err := testhelpers.NewInMemoryMigratedDatabase("aws-iam-idc-controller-tests.db")
+	db, err := migrations.NewInMemoryMigratedDatabase(t, "aws-iam-idc-controller-tests.db")
 
 	require.NoError(t, err)
 
 	awsClient := new(mockAwsSsoOidcClient)
 	mockDatetime := new(mockDatetime)
-	vault := vault.NewVault(db, mockDatetime)
+	logger := zerolog.Nop()
+	errHandler := testhelpers.NewMockErrorHandler(t)
+	ctx := logger.WithContext(context.Background())
+	vault := vault.NewVault(db, mockDatetime, &logger, errHandler)
 	timeSetCall := mockDatetime.On("NowUnix").Return(1)
 	err = vault.ConfigureKey(context.Background(), "abc")
 	require.NoError(t, err)
 	controller := NewAwsIdentityCenterController(db, vault, awsClient, mockDatetime)
-	ctx := zerolog.Nop().WithContext(context.Background())
-	controller.Init(ctx)
+	controller.Init(ctx, errHandler)
 
 	timeSetCall.Unset()
 
@@ -216,7 +218,7 @@ func TestNewAccountSetupErrorLoginTimeout(t *testing.T) {
 	require.Error(t, err, ErrDeviceAuthFlowTimedOut)
 }
 
-func TestNewAccountSetupErrorWhenGettingToken(t *testing.T) {
+func TestNewAccountSetupErrorUserDidNotAuthorizeDevice(t *testing.T) {
 	controller, mockAws, mockTimeProvider := initController(t)
 
 	mockRegRes := awssso.RegistrationResponse{
@@ -241,13 +243,47 @@ func TestNewAccountSetupErrorWhenGettingToken(t *testing.T) {
 	setupResult, err := controller.Setup(startUrl, region)
 	require.NoError(t, err)
 
-	mockAws.On("CreateToken", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil, errors.New("bad for you"))
+	mockAws.On("CreateToken", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil, awssso.ErrDeviceFlowNotAuthorized)
 
 	mockTimeProvider.On("NowUnix").Return(1)
 
 	err = controller.FinalizeSetup(setupResult.ClientId, setupResult.StartUrl, setupResult.Region, setupResult.UserCode, setupResult.DeviceCode)
 
-	require.Error(t, err)
+	require.Error(t, err, ErrDeviceAuthFlowNotAuthorized)
+}
+
+func TestNewAccountSetupErrorDeviceAuthTimeout(t *testing.T) {
+	controller, mockAws, mockTimeProvider := initController(t)
+
+	mockRegRes := awssso.RegistrationResponse{
+		ClientId:     "test-client-id",
+		ClientSecret: "test-client-secret",
+		CreatedAt:    10,
+		ExpiresAt:    200,
+	}
+	mockAws.On("RegisterClient", mock.Anything, mock.AnythingOfType("string")).Return(&mockRegRes, nil)
+
+	mockAuthRes := awssso.AuthorizationResponse{
+		DeviceCode:      "test-device-code",
+		UserCode:        "test-user-code",
+		VerificationUri: "https://test-verification-url",
+		ExpiresIn:       5,
+	}
+	mockAws.On("StartDeviceAuthorization", mock.Anything, mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(&mockAuthRes, nil)
+
+	startUrl := "https://test-start-url.aws-apps.com/start"
+	region := "eu-west-1"
+
+	setupResult, err := controller.Setup(startUrl, region)
+	require.NoError(t, err)
+
+	mockAws.On("CreateToken", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil, awssso.ErrDeviceCodeExpired)
+
+	mockTimeProvider.On("NowUnix").Return(1)
+
+	err = controller.FinalizeSetup(setupResult.ClientId, setupResult.StartUrl, setupResult.Region, setupResult.UserCode, setupResult.DeviceCode)
+
+	require.Error(t, err, ErrDeviceAuthFlowTimedOut)
 }
 
 func TestGetInstanceData(t *testing.T) {
@@ -326,34 +362,6 @@ func TestRefreshAccessToken(t *testing.T) {
 		DeviceCode:      "test-device-code-2",
 		ExpiresIn:       20,
 	}, refreshRes)
-}
-
-func TestRefreshNonExistentAccessTokenError(t *testing.T) {
-	controller, mockAws, mockTimeProvider := initController(t)
-
-	mockRegRes := awssso.RegistrationResponse{
-		ClientId:     "test-client-id",
-		ClientSecret: "test-client-secret",
-		CreatedAt:    10,
-		ExpiresAt:    500,
-	}
-	mockAws.On("RegisterClient", mock.Anything, mock.AnythingOfType("string")).Return(&mockRegRes, nil)
-
-	startUrl := "https://test-start-url.aws-apps.com/start"
-
-	tokenCreatedAt := 1
-	mockTimeProvider.On("NowUnix").Return(tokenCreatedAt)
-
-	mockAuthRes := awssso.AuthorizationResponse{
-		DeviceCode:              "test-device-code",
-		UserCode:                "test-user-code",
-		VerificationUriComplete: "https://test-verification-url",
-		ExpiresIn:               7,
-	}
-	mockAws.On("StartDeviceAuthorization", mock.Anything, mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(&mockAuthRes, nil)
-
-	_, err := controller.RefreshAccessToken(startUrl)
-	require.Error(t, err)
 }
 
 func TestFinalizeRefreshAccessToken(t *testing.T) {

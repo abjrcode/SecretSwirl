@@ -14,8 +14,8 @@ export function GetInstanceData(arg1) {
   return window['go']['awsiamidc']['AwsIdentityCenterController']['GetInstanceData'](arg1);
 }
 
-export function Init(arg1) {
-  return window['go']['awsiamidc']['AwsIdentityCenterController']['Init'](arg1);
+export function Init(arg1, arg2) {
+  return window['go']['awsiamidc']['AwsIdentityCenterController']['Init'](arg1, arg2);
 }
 
 export function RefreshAccessToken(arg1) {

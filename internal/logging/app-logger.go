@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/rs/zerolog/pkgerrors"
+
 	"github.com/rs/zerolog"
 )
 
@@ -24,12 +26,18 @@ func InitLogFile(appDataDir, logFileName string) (*os.File, error) {
 	return file, nil
 }
 
-func InitLogger(logFile io.Writer) zerolog.Logger {
+func InitLogger(logFile io.Writer, appVersion, commitSha string) zerolog.Logger {
 	consoleWriter := zerolog.ConsoleWriter{Out: os.Stdout}
 
 	logSink := zerolog.MultiLevelWriter(consoleWriter, logFile)
 
-	logger := zerolog.New(logSink).With().Timestamp().Logger()
+	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
+
+	logger := zerolog.New(logSink).With().
+		Timestamp().
+		Str("version", appVersion).
+		Str("commit_sha", commitSha).
+		Logger()
 
 	log.SetFlags(0)
 	log.SetOutput(logger)

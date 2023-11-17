@@ -4,13 +4,15 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/abjrcode/swervo/internal/logging"
 	"github.com/rs/zerolog"
 )
 
 type DashboardController struct {
-	ctx    context.Context
-	logger *zerolog.Logger
-	db     *sql.DB
+	ctx          context.Context
+	logger       *zerolog.Logger
+	errorHandler logging.ErrorHandler
+	db           *sql.DB
 }
 
 type Provider struct {
@@ -38,11 +40,12 @@ var (
 
 var supportedProviders []Provider
 
-func (c *DashboardController) Init(ctx context.Context) {
+func (c *DashboardController) Init(ctx context.Context, errorHandler logging.ErrorHandler) {
 	c.ctx = ctx
 	c.logger = zerolog.Ctx(ctx)
-	supportedProviders = make([]Provider, 0, len(SupportedProviders))
+	c.errorHandler = errorHandler
 
+	supportedProviders = make([]Provider, 0, len(SupportedProviders))
 	for _, provider := range SupportedProviders {
 		supportedProviders = append(supportedProviders, provider)
 	}
@@ -61,7 +64,7 @@ func (c *DashboardController) ListFavorites() ([]ConfiguredProvider, error) {
 		var provider ConfiguredProvider
 		err := rows.Scan(&provider.Code, &provider.InstanceId, &provider.DisplayName, &provider.IsFavorite)
 		if err != nil {
-			return []ConfiguredProvider{}, err
+			c.errorHandler.Catch(c.logger, err)
 		}
 		providers = append(providers, provider)
 	}

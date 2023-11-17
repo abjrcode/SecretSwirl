@@ -1,5 +1,5 @@
 import React from "react"
-import { ShowErrorDialog, ShowWarningDialog } from '../../wailsjs/go/main/AppController'
+import { ShowErrorDialog, ShowWarningDialog, CatchUnhandledError } from '../../wailsjs/go/main/AppController'
 import { BrowserOpenURL } from '../../wailsjs/runtime'
 
 export const ContextValue = {
@@ -7,6 +7,7 @@ export const ContextValue = {
     BrowserOpenURL,
     ShowWarningDialog,
     ShowErrorDialog,
+    CatchUnhandledError,
   },
 }
 
