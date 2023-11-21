@@ -24,11 +24,11 @@ var (
 )
 
 type Vault interface {
-	// IsSetup returns true if the vault is configured with a key, false otherwise.
-	IsSetup(ctx context.Context) bool
+	// IsConfigured returns true if the vault is configured with a key, false otherwise.
+	IsConfigured(ctx context.Context) bool
 
-	// ConfigureKey configures the vault with a key derived from the given plainPassword.
-	ConfigureKey(ctx context.Context, plainPassword string) error
+	// Configure configures the vault with a key derived from the given plainPassword.
+	Configure(ctx context.Context, plainPassword string) error
 
 	// Open opens the vault with the given plainPassword.
 	// Allows the vault to be used for encryption and decryption.
@@ -36,10 +36,6 @@ type Vault interface {
 
 	// Seal closes the vault and purges the key from memory.
 	Seal()
-
-	// Close closes the vault and purges the key from memory.
-	// Typically used when the vault is no longer needed and the application is shutting down.
-	Close()
 
 	// Vault can be used as an encryption service.
 	encryption.EncryptionService
@@ -67,7 +63,7 @@ func NewVault(db *sql.DB, timeSvc utils.Clock, logger *zerolog.Logger, errHandle
 	}
 }
 
-func (v *vaultImpl) IsSetup(ctx context.Context) bool {
+func (v *vaultImpl) IsConfigured(ctx context.Context) bool {
 	row := v.db.QueryRowContext(ctx, `SELECT "key_id" FROM "argon_key_material";`)
 
 	var keyId string
@@ -85,8 +81,8 @@ func (v *vaultImpl) IsSetup(ctx context.Context) bool {
 	return true
 }
 
-func (v *vaultImpl) ConfigureKey(ctx context.Context, plainPassword string) error {
-	configured := v.IsSetup(ctx)
+func (v *vaultImpl) Configure(ctx context.Context, plainPassword string) error {
+	configured := v.IsConfigured(ctx)
 
 	if configured {
 		return ErrVaultAlreadyConfigured
@@ -100,12 +96,12 @@ func (v *vaultImpl) ConfigureKey(ctx context.Context, plainPassword string) erro
 
 	saltBase64 := base64.RawStdEncoding.EncodeToString(salt)
 
-	hash := sha256Hash(derivedKey)
+	encKeyHash := sha3_512Hash(derivedKey)
 
 	_, err = v.db.ExecContext(ctx, `
 	INSERT INTO "argon_key_material" (
 		"key_id",
-		"key_hash_sha256",
+		"key_hash_sha3_512",
 		"argon2_version",
 		"argon2_variant",
 		"created_at",
@@ -127,7 +123,7 @@ func (v *vaultImpl) ConfigureKey(ctx context.Context, plainPassword string) erro
 		?,
 		?,
 		?
-	);`, keyId, hash,
+	);`, keyId, encKeyHash,
 		DefaultParameters.Aargon2Version, DefaultParameters.Variant,
 		v.timeSvc.NowUnix(), DefaultParameters.Memory,
 		DefaultParameters.Iterations, DefaultParameters.Parallelism,
@@ -142,15 +138,19 @@ func (v *vaultImpl) ConfigureKey(ctx context.Context, plainPassword string) erro
 	return nil
 }
 
+func (v *vaultImpl) IsOpen() bool {
+	return v.encryptionKey != nil
+}
+
 func (v *vaultImpl) Open(ctx context.Context, plainPassword string) (bool, error) {
-	if v.encryptionKey != nil {
+	if v.IsOpen() {
 		return true, nil
 	}
 
 	row := v.db.QueryRowContext(ctx, `
 	SELECT
 		"key_id",
-		"key_hash_sha256",
+		"key_hash_sha3_512",
 		"argon2_version",
 		"argon2_variant",
 		"memory",
@@ -162,7 +162,7 @@ func (v *vaultImpl) Open(ctx context.Context, plainPassword string) (bool, error
 	FROM "argon_key_material";`)
 
 	var keyId string
-	var keyHash string
+	var keyHash []byte
 	var saltBase64 string
 	var params ArgonParameters
 
@@ -177,7 +177,7 @@ func (v *vaultImpl) Open(ctx context.Context, plainPassword string) (bool, error
 
 	v.errHandler.Catch(v.logger, err)
 
-	match, derivedKey, err := comparePasswordAndHash(plainPassword, salt, []byte(keyHash), &params)
+	match, derivedKey, err := comparePasswordAndHash(plainPassword, salt, keyHash, &params)
 
 	v.errHandler.Catch(v.logger, err)
 
@@ -195,12 +195,8 @@ func (v *vaultImpl) Seal() {
 	memguard.Purge()
 }
 
-func (v *vaultImpl) Close() {
-	defer memguard.Purge()
-}
-
 func (v *vaultImpl) EncryptBinary(plaintext []byte) ([]byte, string, error) {
-	if v.encryptionKey == nil {
+	if !v.IsOpen() {
 		return nil, "", ErrVaultNotConfiguredOrSealed
 	}
 
@@ -224,7 +220,7 @@ func (v *vaultImpl) EncryptBinary(plaintext []byte) ([]byte, string, error) {
 }
 
 func (v *vaultImpl) DecryptBinary(ciphertext []byte, keyId string) ([]byte, error) {
-	if v.encryptionKey == nil {
+	if !v.IsOpen() {
 		return nil, ErrVaultNotConfiguredOrSealed
 	}
 
@@ -252,7 +248,7 @@ func (v *vaultImpl) DecryptBinary(ciphertext []byte, keyId string) ([]byte, erro
 }
 
 func (v *vaultImpl) Encrypt(plaintext string) (string, string, error) {
-	if v.encryptionKey == nil {
+	if !v.IsOpen() {
 		return "", "", ErrVaultNotConfiguredOrSealed
 	}
 
@@ -264,7 +260,7 @@ func (v *vaultImpl) Encrypt(plaintext string) (string, string, error) {
 }
 
 func (v *vaultImpl) Decrypt(ciphertext string, keyId string) (string, error) {
-	if v.encryptionKey == nil {
+	if !v.IsOpen() {
 		return "", ErrVaultNotConfiguredOrSealed
 	}
 

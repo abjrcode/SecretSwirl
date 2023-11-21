@@ -8,7 +8,7 @@ CREATE TABLE "providers" (
 
 CREATE TABLE "argon_key_material" (
 	"key_id"	TEXT NOT NULL UNIQUE,
-	"key_hash_sha256"	TEXT NOT NULL,
+	"key_hash_sha3_512"	TEXT NOT NULL,
   "argon2_version"  TEXT NOT NULL,
   "argon2_variant"  TEXT NOT NULL,
   "created_at"  INTEGER NOT NULL,
