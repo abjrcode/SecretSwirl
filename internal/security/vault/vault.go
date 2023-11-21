@@ -46,7 +46,7 @@ type Vault interface {
 }
 
 type vaultImpl struct {
-	timeSvc       utils.Datetime
+	timeSvc       utils.Clock
 	db            *sql.DB
 	logger        *zerolog.Logger
 	errHandler    logging.ErrorHandler
@@ -54,7 +54,7 @@ type vaultImpl struct {
 	encryptionKey *memguard.Enclave
 }
 
-func NewVault(db *sql.DB, timeSvc utils.Datetime, logger *zerolog.Logger, errHandler logging.ErrorHandler) Vault {
+func NewVault(db *sql.DB, timeSvc utils.Clock, logger *zerolog.Logger, errHandler logging.ErrorHandler) Vault {
 	memguard.CatchInterrupt()
 
 	enrichedLogger := logger.With().Str("component", "vault").Logger()

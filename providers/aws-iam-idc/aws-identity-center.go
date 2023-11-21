@@ -21,6 +21,7 @@ var (
 	ErrInvalidAwsRegion            = errors.New("INVALID_AWS_REGION")
 	ErrDeviceAuthFlowNotAuthorized = errors.New("DEVICE_AUTH_FLOW_NOT_AUTHORIZED")
 	ErrDeviceAuthFlowTimedOut      = errors.New("DEVICE_AUTH_FLOW_TIMED_OUT")
+	ErrInstanceWasNotFound         = errors.New("INSTANCE_WAS_NOT_FOUND")
 	ErrAccessTokenExpired          = errors.New("ACCESS_TOKEN_EXPIRED")
 	ErrInstanceAlreadyRegistered   = errors.New("INSTANCE_ALREADY_REGISTERED")
 	ErrTransientAwsClientError     = errors.New("TRANSIENT_AWS_CLIENT_ERROR")
@@ -33,10 +34,10 @@ type AwsIdentityCenterController struct {
 	db                *sql.DB
 	encryptionService encryption.EncryptionService
 	awsSsoClient      awssso.AwsSsoOidcClient
-	timeHelper        utils.Datetime
+	timeHelper        utils.Clock
 }
 
-func NewAwsIdentityCenterController(db *sql.DB, encryptionService encryption.EncryptionService, awsSsoClient awssso.AwsSsoOidcClient, datetime utils.Datetime) *AwsIdentityCenterController {
+func NewAwsIdentityCenterController(db *sql.DB, encryptionService encryption.EncryptionService, awsSsoClient awssso.AwsSsoOidcClient, datetime utils.Clock) *AwsIdentityCenterController {
 	return &AwsIdentityCenterController{
 		db:                db,
 		encryptionService: encryptionService,
@@ -74,7 +75,7 @@ func (c *AwsIdentityCenterController) GetInstanceData(startUrl string) (*AwsIden
 
 	if err := row.Scan(&region, &accessTokenEnc, &accessTokenCreatedAt, &accessTokenExpiresIn, &encKeyId); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			c.errHandler.CatchWithMsg(c.logger, err, fmt.Sprintf("no token found for Start URL [%s]", startUrl))
+			return nil, ErrInstanceWasNotFound
 		}
 
 		c.errHandler.Catch(c.logger, err)
@@ -95,10 +96,6 @@ func (c *AwsIdentityCenterController) GetInstanceData(startUrl string) (*AwsIden
 	accountsOut, err := c.awsSsoClient.ListAccounts(ctx, accessToken)
 
 	if err != nil {
-		if errors.Is(err, awssso.ErrAccessTokenExpired) {
-			return nil, ErrAccessTokenExpired
-		}
-
 		c.logger.Error().Err(err).Msg("aws sso client failed to list accounts")
 
 		return nil, ErrTransientAwsClientError
@@ -168,7 +165,7 @@ func (c *AwsIdentityCenterController) Setup(startUrlStr, awsRegion string) (*Aut
 	authorizeRes, err := c.authorizeDevice(ctx, startUrl, regRes.ClientId, regRes.ClientSecret)
 
 	if err != nil {
-		if errors.Is(err, awssso.ErrInvalidStartUrl) {
+		if errors.Is(err, awssso.ErrInvalidRequest) {
 			c.logger.Debug().Err(err).Msg("failed to authorize device because start URL is invalid")
 			return nil, ErrInvalidStartUrl
 		}
@@ -270,13 +267,8 @@ func (c *AwsIdentityCenterController) FinalizeSetup(clientId, startUrl, region, 
 func (c *AwsIdentityCenterController) RefreshAccessToken(startUrlStr string) (*AuthorizeDeviceFlowResult, error) {
 	startUrl, err := url.Parse(startUrlStr)
 
-	if startUrl.Scheme == "" || startUrl.Host == "" {
+	if err != nil || startUrl.Scheme == "" || startUrl.Host == "" {
 		c.logger.Debug().Msgf("invalid start URL [%s]", startUrlStr)
-		return nil, ErrInvalidStartUrl
-	}
-
-	if err != nil {
-		c.logger.Debug().Err(err).Msg("failed to parse start URL")
 		return nil, ErrInvalidStartUrl
 	}
 
@@ -285,7 +277,8 @@ func (c *AwsIdentityCenterController) RefreshAccessToken(startUrlStr string) (*A
 
 	if err := row.Scan(&awsRegion); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			c.errHandler.CatchWithMsg(c.logger, err, fmt.Sprintf("no instance found for Start URL [%s]", startUrlStr))
+			c.logger.Debug().Msgf("instance [%s] was not found", startUrlStr)
+			return nil, ErrInstanceWasNotFound
 		}
 	}
 
@@ -300,11 +293,6 @@ func (c *AwsIdentityCenterController) RefreshAccessToken(startUrlStr string) (*A
 	authorizeRes, err := c.authorizeDevice(ctx, startUrl, regRes.ClientId, regRes.ClientSecret)
 
 	if err != nil {
-		if errors.Is(err, awssso.ErrInvalidStartUrl) {
-			c.logger.Debug().Err(err).Msg("failed to authorize device because start URL is invalid")
-			return nil, ErrInvalidStartUrl
-		}
-
 		c.logger.Error().Err(err).Msg("failed to authorize device")
 		return nil, ErrTransientAwsClientError
 	}
