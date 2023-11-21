@@ -2,17 +2,17 @@ package utils
 
 import "time"
 
-type Datetime interface {
+type Clock interface {
 	NowUnix() int64
 }
 
-type datetime struct{}
+type clock struct{}
 
-func NewDatetime() Datetime {
-	return &datetime{}
+func NewClock() Clock {
+	return &clock{}
 }
 
 // NowUnix returns the current Unix time in seconds (number of seconds since Epoch).
-func (d *datetime) NowUnix() int64 {
+func (d *clock) NowUnix() int64 {
 	return time.Now().Unix()
 }
