@@ -54,7 +54,7 @@ func initController(t *testing.T) (*AwsIdentityCenterController, *mockAwsSsoOidc
 	ctx := logger.WithContext(context.Background())
 	vault := vault.NewVault(db, mockDatetime, &logger, errHandler)
 	timeSetCall := mockDatetime.On("NowUnix").Return(1)
-	err = vault.ConfigureKey(context.Background(), "abc")
+	err = vault.Configure(context.Background(), "abc")
 	require.NoError(t, err)
 	controller := NewAwsIdentityCenterController(db, vault, awsClient, mockDatetime)
 	controller.Init(ctx, errHandler)

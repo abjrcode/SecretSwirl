@@ -26,10 +26,10 @@ package vault
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
 	"crypto/subtle"
 
 	"golang.org/x/crypto/argon2"
+	"golang.org/x/crypto/sha3"
 )
 
 type ArgonParameters struct {
@@ -76,7 +76,7 @@ func generateRandomBytes(n uint32) ([]byte, error) {
 func comparePasswordAndHash(password string, salt, hash []byte, p *ArgonParameters) (bool, []byte, error) {
 	derivedKey := argon2.IDKey([]byte(password), salt, p.Iterations, p.Memory, p.Parallelism, p.KeyLength)
 
-	derivedKeyHash := sha256Hash(derivedKey)
+	derivedKeyHash := sha3_512Hash(derivedKey)
 
 	if subtle.ConstantTimeCompare(hash, derivedKeyHash) == 1 {
 		return true, derivedKey, nil
@@ -84,8 +84,6 @@ func comparePasswordAndHash(password string, salt, hash []byte, p *ArgonParamete
 	return false, nil, nil
 }
 
-func sha256Hash(data []byte) []byte {
-	h := sha256.New()
-	h.Write(data)
-	return h.Sum(nil)
+func sha3_512Hash(data []byte) []byte {
+	return sha3.New512().Sum(data)
 }
