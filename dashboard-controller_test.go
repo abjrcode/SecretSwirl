@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func initController(t *testing.T) *DashboardController {
+func initDashboardController(t *testing.T) *DashboardController {
 	db, err := migrations.NewInMemoryMigratedDatabase(t, "dashboard-controller-tests.db")
 
 	require.NoError(t, err)
@@ -26,7 +26,7 @@ func initController(t *testing.T) *DashboardController {
 }
 
 func TestListFavoritesEmpty(t *testing.T) {
-	controller := initController(t)
+	controller := initDashboardController(t)
 
 	favorites, err := controller.ListFavorites()
 	require.NoError(t, err)
