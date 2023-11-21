@@ -94,7 +94,7 @@ func main() {
 	appController := NewAppController()
 	timeProvider := utils.NewClock()
 	vault := vault.NewVault(sqlDb, timeProvider, &logger, errorHandler)
-	defer vault.Close()
+	defer vault.Seal()
 
 	authController := NewAuthController(vault)
 	dashboardController := NewDashboardController(sqlDb)

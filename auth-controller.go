@@ -30,19 +30,23 @@ func (c *AuthController) Init(ctx context.Context, errorHandler logging.ErrorHan
 
 func (c *AuthController) IsVaultConfigured() bool {
 	c.logger.Info().Msg("checking if vault is already configured")
-	return c.vault.IsSetup(c.ctx)
+	return c.vault.IsConfigured(c.ctx)
 }
 
+// ConfigureVault sets up the vault with a master password. It is called when the user sets up the app for the first time.
+// After configuration, the vault is unsealed and ready to be used.
 func (c *AuthController) ConfigureVault(password string) error {
-	c.logger.Info().Msg("setting up sault with a master password")
-	return c.vault.ConfigureKey(c.ctx, password)
+	c.logger.Info().Msg("setting up vault with a master password")
+	return c.vault.Configure(c.ctx, password)
 }
 
+// UnlockVault opens the vault with the given password. It is called when the user logs in.
 func (c *AuthController) UnlockVault(password string) (bool, error) {
 	c.logger.Info().Msg("attempting to unlock vault with a master password")
 	return c.vault.Open(c.ctx, password)
 }
 
+// LockVault closes the vault and purges the key from memory. It is called when the user logs out.
 func (c *AuthController) LockVault() {
 	c.logger.Info().Msg("locking Vault")
 	c.vault.Seal()
