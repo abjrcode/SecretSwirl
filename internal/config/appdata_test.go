@@ -92,3 +92,43 @@ func TestGetAppDataDir(t *testing.T) {
 		})
 	}
 }
+
+func TestInitializeAppDataDirectory(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	type test struct {
+		name         string
+		appDataDir   string
+		wantDirExist bool
+	}
+
+	tests := []test{
+		{
+			name:         "Should create the directory if it does not exist",
+			appDataDir:   filepath.Join(tmpDir, "swervo_data"),
+			wantDirExist: true,
+		},
+		{
+			name:         "Should create the directory and all of its non existent parents if they do not exist",
+			appDataDir:   filepath.Join(tmpDir, "my/fun/storage/location/swervo_data"),
+			wantDirExist: true,
+		},
+		{
+			name:         "Should not return an error if the directory already exists",
+			appDataDir:   filepath.Join(tmpDir, "swervo_data"),
+			wantDirExist: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			InitializeAppDataDir(tt.appDataDir)
+
+			if tt.wantDirExist {
+				assert.DirExists(t, tt.appDataDir)
+			} else {
+				assert.NoDirExists(t, tt.appDataDir)
+			}
+		})
+	}
+}

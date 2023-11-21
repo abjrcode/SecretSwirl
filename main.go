@@ -92,7 +92,7 @@ func main() {
 	}
 
 	appController := NewAppController()
-	timeProvider := utils.NewDatetime()
+	timeProvider := utils.NewClock()
 	vault := vault.NewVault(sqlDb, timeProvider, &logger, errorHandler)
 	defer vault.Close()
 
