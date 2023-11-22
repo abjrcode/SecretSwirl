@@ -9,7 +9,6 @@ import {
 
 export function AwsIamIdcCard({
   instanceId,
-  displayName,
 }: {
   instanceId: string
   displayName: string
@@ -55,7 +54,7 @@ export function AwsIamIdcCard({
         <div
           role="heading"
           className="card-title justify-between">
-          <h1 className="text-2xl font-semibold">{displayName}</h1>
+          <h1 className="text-2xl font-semibold">AWS IAM Identity Center</h1>
         </div>
         <div className="card-body">
           <h2 className="text-xl">Accounts</h2>
@@ -107,7 +106,7 @@ export function AwsIamIdcCard({
           <div
             role="heading"
             className="card-title justify-between">
-            <h1 className="text-2xl font-semibold">{displayName}</h1>
+            <h1 className="text-2xl font-semibold">AWS IAM Identity Center</h1>
           </div>
           <div className="card-body">
             <h2 className="text-xl">Access Token Expired</h2>
@@ -129,7 +128,7 @@ export function AwsIamIdcCard({
           <div
             role="heading"
             className="card-title justify-between">
-            <h1 className="text-2xl font-semibold">{displayName}</h1>
+            <h1 className="text-2xl font-semibold">AWS IAM Identity Center</h1>
           </div>
           <div className="card-body">
             <h2 className="text-xl">

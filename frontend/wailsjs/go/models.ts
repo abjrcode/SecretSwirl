@@ -40,6 +40,7 @@ export namespace awsiamidc {
 	}
 	export class AwsIdentityCenterCardData {
 	    enabled: boolean;
+	    instanceId: string;
 	    accessTokenExpiresIn: string;
 	    accounts: AwsIdentityCenterAccount[];
 	
@@ -50,6 +51,7 @@ export namespace awsiamidc {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.enabled = source["enabled"];
+	        this.instanceId = source["instanceId"];
 	        this.accessTokenExpiresIn = source["accessTokenExpiresIn"];
 	        this.accounts = this.convertValues(source["accounts"], AwsIdentityCenterAccount);
 	    }
@@ -77,24 +79,18 @@ export namespace awsiamidc {
 
 export namespace main {
 	
-	export class ConfiguredProvider {
-	    code: string;
-	    displayName: string;
+	export class FavoriteInstance {
+	    providerCode: string;
 	    instanceId: string;
-	    isFavorite: boolean;
-	    iconSvgBase64: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new ConfiguredProvider(source);
+	        return new FavoriteInstance(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.code = source["code"];
-	        this.displayName = source["displayName"];
+	        this.providerCode = source["providerCode"];
 	        this.instanceId = source["instanceId"];
-	        this.isFavorite = source["isFavorite"];
-	        this.iconSvgBase64 = source["iconSvgBase64"];
 	    }
 	}
 	export class Provider {

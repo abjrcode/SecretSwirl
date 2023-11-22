@@ -8,19 +8,21 @@ const ProviderComponentMap = new Map<string, React.FC<any>>([
 ])
 
 export function Dashboard() {
-  const favoriteProviders = useLoaderData() as main.ConfiguredProvider[]
+  const favoriteInstances = useLoaderData() as main.FavoriteInstance[]
 
   return (
     <>
-      {...favoriteProviders.map((provider) => {
-        const Component = ProviderComponentMap.get(provider.code)
+      {...favoriteInstances.map((favorite) => {
+        const Component = ProviderComponentMap.get(favorite.providerCode)
         if (!Component) {
-          throw new Error(`No component found for provider [${provider}]`)
+          throw new Error(
+            `No component found for provider of type [${favorite.providerCode}] and ID [${favorite.instanceId}]`,
+          )
         }
         return (
           <Component
-            key={provider.instanceId}
-            {...provider}
+            key={favorite.instanceId}
+            {...favorite}
           />
         )
       })}

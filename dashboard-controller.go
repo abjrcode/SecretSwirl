@@ -21,12 +21,9 @@ type Provider struct {
 	IconSvgBase64 string `json:"iconSvgBase64"`
 }
 
-type ConfiguredProvider struct {
-	Code          string `json:"code"`
-	DisplayName   string `json:"displayName"`
-	InstanceId    string `json:"instanceId"`
-	IsFavorite    bool   `json:"isFavorite"`
-	IconSvgBase64 string `json:"iconSvgBase64"`
+type FavoriteInstance struct {
+	ProviderCode string `json:"providerCode"`
+	InstanceId   string `json:"instanceId"`
 }
 
 var (
@@ -59,25 +56,29 @@ func (c *DashboardController) Init(ctx context.Context, errorHandler logging.Err
 	}
 }
 
-func (c *DashboardController) ListFavorites() ([]ConfiguredProvider, error) {
-	rows, err := c.db.QueryContext(c.ctx, `SELECT * FROM providers WHERE is_favorite = ?;`, true)
+func (c *DashboardController) ListFavorites() ([]FavoriteInstance, error) {
+	rows, err := c.db.QueryContext(c.ctx, `SELECT * FROM favorite_instances`)
 
 	if err != nil {
-		return []ConfiguredProvider{}, err
+		if err == sql.ErrNoRows {
+			return []FavoriteInstance{}, nil
+		}
+
+		c.errorHandler.Catch(c.logger, err)
 	}
 
-	providers := make([]ConfiguredProvider, 0, 10)
+	favorites := make([]FavoriteInstance, 0, 10)
 
 	for rows.Next() {
-		var provider ConfiguredProvider
-		err := rows.Scan(&provider.Code, &provider.InstanceId, &provider.DisplayName, &provider.IsFavorite)
+		var favorite FavoriteInstance
+		err := rows.Scan(&favorite.ProviderCode, &favorite.InstanceId)
 		if err != nil {
 			c.errorHandler.Catch(c.logger, err)
 		}
-		providers = append(providers, provider)
+		favorites = append(favorites, favorite)
 	}
 
-	return providers, nil
+	return favorites, nil
 }
 
 func (c *DashboardController) ListProviders() []Provider {

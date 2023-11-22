@@ -17,6 +17,7 @@ export async function awsIamIdcDeviceAuthAction({ request }: ActionFunctionArgs)
   const updates = Object.fromEntries(formData)
 
   const action = updates["action"].toString()
+  const instanceId = updates["instanceId"].toString()
   const clientId = updates["clientId"].toString()
   const startUrl = updates["startUrl"].toString()
   const awsRegion = updates["awsRegion"].toString()
@@ -29,7 +30,7 @@ export async function awsIamIdcDeviceAuthAction({ request }: ActionFunctionArgs)
         await FinalizeSetup(clientId, startUrl, awsRegion, userCode, deviceCode)
         break;
       case "refresh":
-        await FinalizeRefreshAccessToken(clientId, startUrl, awsRegion, userCode, deviceCode)
+        await FinalizeRefreshAccessToken(instanceId, awsRegion, userCode, deviceCode)
         break;
       default:
         throw new Error(`Unknown action: ${action}`)

@@ -27,10 +27,11 @@ export function AwsIamIdcDeviceAuth() {
 
   const {
     action,
-    verificationUriComplete,
+    instanceId,
     clientId,
     startUrl,
     awsRegion,
+    verificationUriComplete,
     userCode,
     deviceCode,
   } = authFlowState.current
@@ -87,6 +88,11 @@ export function AwsIamIdcDeviceAuth() {
         type="hidden"
         name="action"
         value={action}
+      />
+      <input
+        type="hidden"
+        name="instanceId"
+        value={instanceId}
       />
       <input
         type="hidden"

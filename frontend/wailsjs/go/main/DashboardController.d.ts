@@ -6,6 +6,6 @@ import {main} from '../models';
 
 export function Init(arg1:context.Context,arg2:logging.ErrorHandler):Promise<void>;
 
-export function ListFavorites():Promise<Array<main.ConfiguredProvider>>;
+export function ListFavorites():Promise<Array<main.FavoriteInstance>>;
 
 export function ListProviders():Promise<Array<main.Provider>>;
