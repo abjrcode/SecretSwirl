@@ -23,6 +23,7 @@ export function AwsIamIdcSetup() {
             action: "setup",
             clientId: result.clientId,
             startUrl: result.startUrl,
+            label: result.label,
             awsRegion: result.region,
             verificationUriComplete: result.verificationUri,
             userCode: result.userCode,
@@ -37,10 +38,13 @@ export function AwsIamIdcSetup() {
           case AwsIamIdcSetupError.ErrInvalidAwsRegion:
             toaster.showError("The AWS region is not valid")
             break
-          case AwsIamIdcSetupError.ErrInstanceAlreadyRegistered:
-            wails.runtime.ShowWarningDialog(
-              "Start URL and Region combination are already registered",
+          case AwsIamIdcSetupError.ErrInvalidLabel:
+            toaster.showError(
+              "The account label must be between 1 and 50 characters",
             )
+            break
+          case AwsIamIdcSetupError.ErrInstanceAlreadyRegistered:
+            toaster.showWarning("AWS IAM Identity Center already exists")
             break
           case AwsIamIdcSetupError.ErrTransientAwsClientError:
             toaster.showWarning(
@@ -56,7 +60,7 @@ export function AwsIamIdcSetup() {
     <Form
       method="post"
       className="flex flex-col gap-4 border-2 p-6">
-      <h1 className="text-primary text-4xl">AWS IAM IDC</h1>
+      <h1 className="text-primary text-4xl">AWS IAM Identity Center</h1>
       <label className="label">
         <span className="label-text">Start URL</span>
       </label>
@@ -75,6 +79,17 @@ export function AwsIamIdcSetup() {
         defaultValue={awsRegion}>
         <option value={awsRegion}>{awsRegion}</option>
       </select>
+      <label className="label">
+        <span className="label-text">Label</span>
+      </label>
+      <input
+        name="label"
+        type="text"
+        minLength={1}
+        maxLength={50}
+        className="input input-bordered input-primary w-96"
+        placeholder="Personal AWS Account"
+      />
       <button
         type="submit"
         className="btn btn-primary">

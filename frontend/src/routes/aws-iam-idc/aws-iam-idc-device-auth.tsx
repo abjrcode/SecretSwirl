@@ -5,12 +5,10 @@ import {
   AwsIamIdcDeviceAuthFlowResult,
 } from "./aws-iam-idc-device-auth-data"
 import { useEffect, useRef } from "react"
-import { useWails } from "../../wails-provider/wails-context"
 import { useToaster } from "../../toast-provider/toast-context"
 
 export function AwsIamIdcDeviceAuth() {
   const toaster = useToaster()
-  const wails = useWails()
   const location = useLocation()
   const navigate = useNavigate()
   const actionData = useActionData() as AwsIamIdcDeviceAuthFlowResult | undefined
@@ -27,10 +25,12 @@ export function AwsIamIdcDeviceAuth() {
 
   const {
     action,
-    verificationUriComplete,
+    instanceId,
     clientId,
     startUrl,
+    label,
     awsRegion,
+    verificationUriComplete,
     userCode,
     deviceCode,
   } = authFlowState.current
@@ -47,20 +47,25 @@ export function AwsIamIdcDeviceAuth() {
     if (actionData.success === false) {
       switch (actionData.code) {
         case AwsIamIdcDeviceAuthFlowError.ErrDeviceAuthFlowNotAuthorized:
-          wails.runtime.ShowWarningDialog(
+          toaster.showError(
             "You haven not authorized the device through the activation link :(\nPlease do so then click this button again",
           )
           return
         case AwsIamIdcDeviceAuthFlowError.ErrDeviceAuthFlowTimedOut:
-          wails.runtime.ShowWarningDialog(
+          toaster.showError(
             "The device authorization flow timed out and we have to start over",
           )
           return navigate("/")
         case AwsIamIdcDeviceAuthFlowError.ErrInvalidStartUrl:
-          wails.runtime.ShowWarningDialog("The Start URL is not valid")
+          toaster.showError(
+            "The Start URL is not a valid AWS IAM Identity Center URL",
+          )
           return
         case AwsIamIdcDeviceAuthFlowError.ErrInvalidAwsRegion:
-          wails.runtime.ShowWarningDialog("The AWS region is not valid")
+          toaster.showError("The AWS region is not valid")
+          return
+        case AwsIamIdcDeviceAuthFlowError.ErrInvalidLabel:
+          toaster.showError("The account label must be between 1 and 50 characters")
           return
         case AwsIamIdcDeviceAuthFlowError.ErrTransientAwsClientError:
           toaster.showWarning(
@@ -69,7 +74,7 @@ export function AwsIamIdcDeviceAuth() {
           return
       }
     }
-  }, [toaster, wails, navigate, actionData])
+  }, [toaster, navigate, actionData])
 
   return (
     <Form
@@ -90,6 +95,11 @@ export function AwsIamIdcDeviceAuth() {
       />
       <input
         type="hidden"
+        name="instanceId"
+        value={instanceId}
+      />
+      <input
+        type="hidden"
         name="clientId"
         value={clientId}
       />
@@ -102,6 +112,11 @@ export function AwsIamIdcDeviceAuth() {
         type="hidden"
         name="awsRegion"
         value={awsRegion}
+      />
+      <input
+        type="hidden"
+        name="label"
+        value={label}
       />
       <input
         type="hidden"

@@ -3,7 +3,6 @@ package awssso
 import (
 	"context"
 	"errors"
-	"net/url"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sso"
@@ -74,7 +73,7 @@ type ListAccountsResponse struct {
 type AwsSsoOidcClient interface {
 	RegisterClient(ctx context.Context, friendlyClientName string) (*RegistrationResponse, error)
 
-	StartDeviceAuthorization(ctx context.Context, startUrl url.URL, clientId, clientSecret string) (*AuthorizationResponse, error)
+	StartDeviceAuthorization(ctx context.Context, startUrl string, clientId, clientSecret string) (*AuthorizationResponse, error)
 
 	CreateToken(ctx context.Context, clientId, clientSecret, userCode, deviceCode string) (*GetTokenResponse, error)
 
@@ -113,11 +112,11 @@ func (c *awsSsoClientImpl) RegisterClient(ctx context.Context, friendlyClientNam
 	}, nil
 }
 
-func (c *awsSsoClientImpl) StartDeviceAuthorization(ctx context.Context, startUrl url.URL, clientId, clientSecret string) (*AuthorizationResponse, error) {
+func (c *awsSsoClientImpl) StartDeviceAuthorization(ctx context.Context, startUrl string, clientId, clientSecret string) (*AuthorizationResponse, error) {
 	output, err := c.oidcClient.StartDeviceAuthorization(ctx, &ssooidc.StartDeviceAuthorizationInput{
 		ClientId:     aws.String(clientId),
 		ClientSecret: aws.String(clientSecret),
-		StartUrl:     aws.String(startUrl.String()),
+		StartUrl:     aws.String(startUrl),
 	}, func(options *ssooidc.Options) {
 		options.Region = ctx.Value(AwsRegion("awsRegion")).(string)
 	})

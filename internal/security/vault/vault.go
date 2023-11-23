@@ -15,6 +15,7 @@ import (
 	"github.com/abjrcode/swervo/internal/utils"
 	"github.com/awnumar/memguard"
 	"github.com/rs/zerolog"
+	"github.com/segmentio/ksuid"
 )
 
 var (
@@ -88,7 +89,10 @@ func (v *vaultImpl) Configure(ctx context.Context, plainPassword string) error {
 		return ErrVaultAlreadyConfigured
 	}
 
-	keyId := utils.RandomString(4)
+	uniqueId, err := ksuid.NewRandom()
+	v.errHandler.Catch(v.logger, err)
+
+	keyId := uniqueId.String()
 
 	derivedKey, salt, err := generateFromPassword(plainPassword, DefaultParameters)
 
