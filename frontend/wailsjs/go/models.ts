@@ -1,9 +1,11 @@
 export namespace awsiamidc {
 	
 	export class AuthorizeDeviceFlowResult {
-	    clientId: string;
+	    instanceId: string;
 	    startUrl: string;
 	    region: string;
+	    label: string;
+	    clientId: string;
 	    verificationUri: string;
 	    userCode: string;
 	    expiresIn: number;
@@ -15,9 +17,11 @@ export namespace awsiamidc {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.clientId = source["clientId"];
+	        this.instanceId = source["instanceId"];
 	        this.startUrl = source["startUrl"];
 	        this.region = source["region"];
+	        this.label = source["label"];
+	        this.clientId = source["clientId"];
 	        this.verificationUri = source["verificationUri"];
 	        this.userCode = source["userCode"];
 	        this.expiresIn = source["expiresIn"];
@@ -39,7 +43,10 @@ export namespace awsiamidc {
 	    }
 	}
 	export class AwsIdentityCenterCardData {
+	    instanceId: string;
 	    enabled: boolean;
+	    label: string;
+	    isAccessTokenExpired: boolean;
 	    accessTokenExpiresIn: string;
 	    accounts: AwsIdentityCenterAccount[];
 	
@@ -49,7 +56,10 @@ export namespace awsiamidc {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.instanceId = source["instanceId"];
 	        this.enabled = source["enabled"];
+	        this.label = source["label"];
+	        this.isAccessTokenExpired = source["isAccessTokenExpired"];
 	        this.accessTokenExpiresIn = source["accessTokenExpiresIn"];
 	        this.accounts = this.convertValues(source["accounts"], AwsIdentityCenterAccount);
 	    }
@@ -77,24 +87,18 @@ export namespace awsiamidc {
 
 export namespace main {
 	
-	export class ConfiguredProvider {
-	    code: string;
-	    displayName: string;
+	export class FavoriteInstance {
+	    providerCode: string;
 	    instanceId: string;
-	    isFavorite: boolean;
-	    iconSvgBase64: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new ConfiguredProvider(source);
+	        return new FavoriteInstance(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.code = source["code"];
-	        this.displayName = source["displayName"];
+	        this.providerCode = source["providerCode"];
 	        this.instanceId = source["instanceId"];
-	        this.isFavorite = source["isFavorite"];
-	        this.iconSvgBase64 = source["iconSvgBase64"];
 	    }
 	}
 	export class Provider {

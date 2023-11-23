@@ -7,6 +7,7 @@ export enum AwsIamIdcDeviceAuthFlowError {
   ErrDeviceAuthFlowTimedOut = "DEVICE_AUTH_FLOW_TIMED_OUT",
   ErrInvalidStartUrl = "INVALID_START_URL",
   ErrInvalidAwsRegion = "INVALID_AWS_REGION",
+  ErrInvalidLabel = "INVALID_LABEL",
   ErrTransientAwsClientError = "TRANSIENT_AWS_CLIENT_ERROR",
 }
 
@@ -17,19 +18,21 @@ export async function awsIamIdcDeviceAuthAction({ request }: ActionFunctionArgs)
   const updates = Object.fromEntries(formData)
 
   const action = updates["action"].toString()
+  const instanceId = updates["instanceId"].toString()
   const clientId = updates["clientId"].toString()
   const startUrl = updates["startUrl"].toString()
   const awsRegion = updates["awsRegion"].toString()
+  const label = updates["label"].toString()
   const userCode = updates["userCode"].toString()
   const deviceCode = updates["deviceCode"].toString()
 
   try {
     switch (action) {
       case "setup":
-        await FinalizeSetup(clientId, startUrl, awsRegion, userCode, deviceCode)
+        await FinalizeSetup(clientId, startUrl, awsRegion, label, userCode, deviceCode)
         break;
       case "refresh":
-        await FinalizeRefreshAccessToken(clientId, startUrl, awsRegion, userCode, deviceCode)
+        await FinalizeRefreshAccessToken(instanceId, awsRegion, userCode, deviceCode)
         break;
       default:
         throw new Error(`Unknown action: ${action}`)
@@ -44,6 +47,8 @@ export async function awsIamIdcDeviceAuthAction({ request }: ActionFunctionArgs)
         return { success: false, code: AwsIamIdcDeviceAuthFlowError.ErrInvalidStartUrl, error: e }
       case AwsIamIdcDeviceAuthFlowError.ErrInvalidAwsRegion:
         return { success: false, code: AwsIamIdcDeviceAuthFlowError.ErrInvalidAwsRegion, error: e }
+      case AwsIamIdcDeviceAuthFlowError.ErrInvalidLabel:
+        return { success: false, code: AwsIamIdcDeviceAuthFlowError.ErrInvalidLabel, error: e }
       case AwsIamIdcDeviceAuthFlowError.ErrTransientAwsClientError:
         return { success: false, code: AwsIamIdcDeviceAuthFlowError.ErrTransientAwsClientError, error: e }
       default:

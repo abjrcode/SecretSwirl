@@ -1,9 +1,7 @@
-CREATE TABLE "providers" (
-	"code"	TEXT NOT NULL,
+CREATE TABLE "favorite_instances" (
+	"provider_code"	TEXT NOT NULL,
 	"instance_id"	TEXT NOT NULL,
-	"display_name"	TEXT NOT NULL,
-	"is_favorite"	INTEGER NOT NULL,
-	PRIMARY KEY("code","instance_id")
+	PRIMARY KEY("provider_code","instance_id")
 ) WITHOUT ROWID;
 
 CREATE TABLE "argon_key_material" (
