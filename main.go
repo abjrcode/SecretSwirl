@@ -10,6 +10,7 @@ import (
 	"os"
 
 	"github.com/abjrcode/swervo/clients/awssso"
+	"github.com/abjrcode/swervo/favorites"
 	"github.com/abjrcode/swervo/internal/config"
 	"github.com/abjrcode/swervo/internal/datastore"
 	"github.com/abjrcode/swervo/internal/logging"
@@ -97,7 +98,9 @@ func main() {
 	defer vault.Seal()
 
 	authController := NewAuthController(vault)
-	dashboardController := NewDashboardController(sqlDb)
+
+	favoritesRepo := favorites.NewFavorites(sqlDb, &logger)
+	dashboardController := NewDashboardController(favoritesRepo)
 
 	awsIdcController := awsiamidc.NewAwsIdentityCenterController(sqlDb, vault, awssso.NewAwsSsoOidcClient(), timeProvider)
 
