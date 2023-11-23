@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS "aws_iam_idc_clients" (
 
 CREATE TABLE IF NOT EXISTS "aws_iam_idc_instances" (
 	"instance_id"	TEXT NOT NULL UNIQUE COLLATE NOCASE,
+	"label"	TEXT NOT NULL,
 	"start_url"	INTEGER NOT NULL UNIQUE COLLATE NOCASE,
 	"region"	TEXT NOT NULL,
 	"enabled"	INTEGER NOT NULL,
