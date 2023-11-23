@@ -277,12 +277,6 @@ func (c *AwsIdentityCenterController) FinalizeSetup(clientId, startUrl, region, 
 		return "", ErrTransientAwsClientError
 	}
 
-	tx, err := c.db.BeginTx(ctx, nil)
-
-	c.errHandler.CatchWithMsg(c.logger, err, "failed to start transaction")
-
-	defer tx.Rollback()
-
 	idTokenEnc, keyId, err := c.encryptionService.Encrypt(tokenRes.IdToken)
 
 	c.errHandler.CatchWithMsg(c.logger, err, "failed to encrypt id token")
@@ -302,7 +296,7 @@ func (c *AwsIdentityCenterController) FinalizeSetup(clientId, startUrl, region, 
 	(instance_id, start_url, region, label, enabled, id_token_enc, access_token_enc, token_type, access_token_created_at,
 		access_token_expires_in, refresh_token_enc, enc_key_id)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	_, err = tx.ExecContext(ctx, sql,
+	_, err = c.db.ExecContext(ctx, sql,
 		instanceId,
 		startUrl,
 		region,
@@ -317,14 +311,6 @@ func (c *AwsIdentityCenterController) FinalizeSetup(clientId, startUrl, region, 
 		keyId)
 
 	c.errHandler.CatchWithMsg(c.logger, err, "failed to save token to database")
-
-	_, err = tx.ExecContext(ctx, `INSERT INTO favorite_instances (provider_code, instance_id) VALUES (?, ?) `, "aws-iam-idc", instanceId)
-
-	c.errHandler.CatchWithMsg(c.logger, err, "failed to add provider to list of configured providers")
-
-	err = tx.Commit()
-
-	c.errHandler.CatchWithMsg(c.logger, err, "failed to commit transaction")
 
 	return instanceId, nil
 }
