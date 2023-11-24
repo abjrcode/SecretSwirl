@@ -420,6 +420,11 @@ func TestGetInstanceData(t *testing.T) {
 				AccountId:    "test-account-id",
 				AccountName:  "test-account-name",
 				AccountEmail: "test-account-email",
+				Roles: []awssso.AwsAccountRole{
+					{
+						RoleName: "test-role-name",
+					},
+				},
 			},
 			{
 				AccountId:    "test-account-id-2",
@@ -430,7 +435,7 @@ func TestGetInstanceData(t *testing.T) {
 	}
 	mockAws.On("ListAccounts", mock.Anything, mock.AnythingOfType("string")).Return(&mockListAccountsRes, nil)
 
-	instanceData, err := controller.GetInstanceData(instanceId)
+	instanceData, err := controller.GetInstanceData(instanceId, false)
 	require.NoError(t, err)
 
 	require.Equal(t, instanceId, instanceData.InstanceId)
@@ -439,6 +444,7 @@ func TestGetInstanceData(t *testing.T) {
 	require.Equal(t, false, instanceData.IsAccessTokenExpired)
 	require.Equal(t, "test-account-id", instanceData.Accounts[0].AccountId)
 	require.Equal(t, "test-account-name", instanceData.Accounts[0].AccountName)
+	require.Equal(t, "test-role-name", instanceData.Accounts[0].Roles[0].RoleName)
 
 	require.Equal(t, "test-account-id-2", instanceData.Accounts[1].AccountId)
 	require.Equal(t, "test-account-name-2", instanceData.Accounts[1].AccountName)
@@ -457,7 +463,7 @@ func TestGetInstance_AccessTokenExpired(t *testing.T) {
 
 	// mockAws.On("ListAccounts", mock.Anything, mock.AnythingOfType("string")).Return(nil, awssso.ErrAccessTokenExpired)
 
-	data, err := controller.GetInstanceData(instanceId)
+	data, err := controller.GetInstanceData(instanceId, false)
 
 	require.NoError(t, err)
 
@@ -478,7 +484,7 @@ func TestGetNonExistentInstance(t *testing.T) {
 	}
 	mockAws.On("RegisterClient", mock.Anything, mock.Anything).Return(&mockRegRes, nil)
 
-	_, err := controller.GetInstanceData("well-if-u-can-find-me-it-sucks")
+	_, err := controller.GetInstanceData("well-if-u-can-find-me-it-sucks", false)
 	require.Error(t, err, ErrInstanceWasNotFound)
 }
 
@@ -511,7 +517,7 @@ func TestMarkInstanceAsFavorite(t *testing.T) {
 	}
 	mockAws.On("ListAccounts", mock.Anything, mock.AnythingOfType("string")).Return(&mockListAccountsRes, nil)
 
-	instanceData, err := controller.GetInstanceData(instanceId)
+	instanceData, err := controller.GetInstanceData(instanceId, false)
 	require.NoError(t, err)
 
 	require.Equal(t, true, instanceData.IsFavorite)
@@ -546,7 +552,7 @@ func TestUnmarkInstanceAsFavorite(t *testing.T) {
 	}
 	mockAws.On("ListAccounts", mock.Anything, mock.AnythingOfType("string")).Return(&mockListAccountsRes, nil)
 
-	instanceData, err := controller.GetInstanceData(instanceId)
+	instanceData, err := controller.GetInstanceData(instanceId, false)
 	require.NoError(t, err)
 	require.Equal(t, true, instanceData.IsFavorite)
 
@@ -555,7 +561,7 @@ func TestUnmarkInstanceAsFavorite(t *testing.T) {
 
 	mockTimeProvider.On("NowUnix").Once().Return(5)
 
-	instanceData, err = controller.GetInstanceData(instanceId)
+	instanceData, err = controller.GetInstanceData(instanceId, false)
 	require.NoError(t, err)
 
 	require.Equal(t, false, instanceData.IsFavorite)

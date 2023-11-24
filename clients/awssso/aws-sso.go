@@ -62,8 +62,13 @@ type GetTokenResponse struct {
 	ExpiresIn                                     int32
 }
 
+type AwsAccountRole struct {
+	RoleName string
+}
+
 type AwsAccount struct {
 	AccountId, AccountEmail, AccountName string
+	Roles                                []AwsAccountRole
 }
 
 type ListAccountsResponse struct {
@@ -190,14 +195,30 @@ func (c *awsSsoClientImpl) ListAccounts(ctx context.Context, accessToken string)
 	var accounts []AwsAccount
 
 	for _, account := range output.AccountList {
-		accounts = append(accounts, struct {
-			AccountId    string
-			AccountEmail string
-			AccountName  string
-		}{
+		var roles []AwsAccountRole
+
+		accountRoles, err := c.ssoClient.ListAccountRoles(ctx, &sso.ListAccountRolesInput{
+			AccessToken: aws.String(accessToken),
+			AccountId:   account.AccountId,
+		}, func(options *sso.Options) {
+			options.Region = ctx.Value(AwsRegion("awsRegion")).(string)
+		})
+
+		if err != nil {
+			return nil, err
+		}
+
+		for _, role := range accountRoles.RoleList {
+			roles = append(roles, AwsAccountRole{
+				RoleName: *role.RoleName,
+			})
+		}
+
+		accounts = append(accounts, AwsAccount{
 			AccountId:    *account.AccountId,
 			AccountEmail: *account.EmailAddress,
 			AccountName:  *account.AccountName,
+			Roles:        roles,
 		})
 	}
 
