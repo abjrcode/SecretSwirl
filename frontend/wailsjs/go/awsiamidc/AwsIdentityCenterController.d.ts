@@ -10,6 +10,8 @@ export function FinalizeSetup(arg1:string,arg2:string,arg3:string,arg4:string,ar
 
 export function GetInstanceData(arg1:string,arg2:boolean):Promise<awsiamidc.AwsIdentityCenterCardData>;
 
+export function GetRoleCredentials(arg1:string,arg2:string,arg3:string):Promise<awsiamidc.AwsIdentityCenterAccountRoleCredentials>;
+
 export function Init(arg1:context.Context,arg2:logging.ErrorHandler):Promise<void>;
 
 export function ListInstances():Promise<Array<string>>;
