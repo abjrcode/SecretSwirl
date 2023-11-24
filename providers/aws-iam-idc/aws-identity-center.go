@@ -9,9 +9,11 @@ import (
 	"time"
 
 	"github.com/abjrcode/swervo/clients/awssso"
+	"github.com/abjrcode/swervo/favorites"
 	"github.com/abjrcode/swervo/internal/logging"
 	"github.com/abjrcode/swervo/internal/security/encryption"
 	"github.com/abjrcode/swervo/internal/utils"
+	"github.com/abjrcode/swervo/providers"
 	"github.com/dustin/go-humanize"
 	"github.com/rs/zerolog"
 	"github.com/segmentio/ksuid"
@@ -33,14 +35,16 @@ type AwsIdentityCenterController struct {
 	logger            *zerolog.Logger
 	errHandler        logging.ErrorHandler
 	db                *sql.DB
+	favoritesRepo     favorites.FavoritesRepo
 	encryptionService encryption.EncryptionService
 	awsSsoClient      awssso.AwsSsoOidcClient
 	timeHelper        utils.Clock
 }
 
-func NewAwsIdentityCenterController(db *sql.DB, encryptionService encryption.EncryptionService, awsSsoClient awssso.AwsSsoOidcClient, datetime utils.Clock) *AwsIdentityCenterController {
+func NewAwsIdentityCenterController(db *sql.DB, favoritesRepo favorites.FavoritesRepo, encryptionService encryption.EncryptionService, awsSsoClient awssso.AwsSsoOidcClient, datetime utils.Clock) *AwsIdentityCenterController {
 	return &AwsIdentityCenterController{
 		db:                db,
+		favoritesRepo:     favoritesRepo,
 		encryptionService: encryptionService,
 		awsSsoClient:      awsSsoClient,
 		timeHelper:        datetime,
@@ -63,9 +67,36 @@ type AwsIdentityCenterCardData struct {
 	InstanceId           string                     `json:"instanceId"`
 	Enabled              bool                       `json:"enabled"`
 	Label                string                     `json:"label"`
+	IsFavorite           bool                       `json:"isFavorite"`
 	IsAccessTokenExpired bool                       `json:"isAccessTokenExpired"`
 	AccessTokenExpiresIn string                     `json:"accessTokenExpiresIn"`
 	Accounts             []AwsIdentityCenterAccount `json:"accounts"`
+}
+
+func (c *AwsIdentityCenterController) ListInstances() ([]string, error) {
+	rows, err := c.db.QueryContext(c.ctx, "SELECT instance_id FROM aws_iam_idc_instances ORDER BY instance_id DESC")
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return make([]string, 0), nil
+		}
+
+		c.errHandler.Catch(c.logger, err)
+	}
+
+	instances := make([]string, 0)
+
+	for rows.Next() {
+		var instanceId string
+
+		if err := rows.Scan(&instanceId); err != nil {
+			c.errHandler.Catch(c.logger, err)
+		}
+
+		instances = append(instances, instanceId)
+	}
+
+	return instances, nil
 }
 
 func (c *AwsIdentityCenterController) GetInstanceData(instanceId string) (*AwsIdentityCenterCardData, error) {
@@ -86,6 +117,13 @@ func (c *AwsIdentityCenterController) GetInstanceData(instanceId string) (*AwsId
 		c.errHandler.Catch(c.logger, err)
 	}
 
+	isFavorite, err := c.favoritesRepo.IsFavorite(c.ctx, &favorites.Favorite{
+		ProviderCode: providers.AwsIamIdc,
+		InstanceId:   instanceId,
+	})
+
+	c.errHandler.CatchWithMsg(c.logger, err, "failed to check if instance is favorite")
+
 	now := c.timeHelper.NowUnix()
 	if now > accessTokenCreatedAt+accessTokenExpiresIn {
 		c.logger.Info().Msgf("token for instance [%s] has expired", instanceId)
@@ -94,6 +132,7 @@ func (c *AwsIdentityCenterController) GetInstanceData(instanceId string) (*AwsId
 			Enabled:              true,
 			InstanceId:           instanceId,
 			Label:                label,
+			IsFavorite:           isFavorite,
 			IsAccessTokenExpired: true,
 			AccessTokenExpiresIn: humanize.Time(time.Unix(accessTokenCreatedAt+accessTokenExpiresIn, 0)),
 			Accounts:             make([]AwsIdentityCenterAccount, 0),
@@ -126,6 +165,7 @@ func (c *AwsIdentityCenterController) GetInstanceData(instanceId string) (*AwsId
 		Enabled:              true,
 		InstanceId:           instanceId,
 		Label:                label,
+		IsFavorite:           isFavorite,
 		IsAccessTokenExpired: false,
 		AccessTokenExpiresIn: humanize.Time(time.Unix(accessTokenCreatedAt+accessTokenExpiresIn, 0)),
 		Accounts:             accounts,
@@ -277,12 +317,6 @@ func (c *AwsIdentityCenterController) FinalizeSetup(clientId, startUrl, region, 
 		return "", ErrTransientAwsClientError
 	}
 
-	tx, err := c.db.BeginTx(ctx, nil)
-
-	c.errHandler.CatchWithMsg(c.logger, err, "failed to start transaction")
-
-	defer tx.Rollback()
-
 	idTokenEnc, keyId, err := c.encryptionService.Encrypt(tokenRes.IdToken)
 
 	c.errHandler.CatchWithMsg(c.logger, err, "failed to encrypt id token")
@@ -294,7 +328,9 @@ func (c *AwsIdentityCenterController) FinalizeSetup(clientId, startUrl, region, 
 	refreshTokenEnc, _, err := c.encryptionService.Encrypt(tokenRes.RefreshToken)
 	c.errHandler.CatchWithMsg(c.logger, err, "failed to encrypt refresh token")
 
-	uniqueId, err := ksuid.NewRandom()
+	nowUnix := c.timeHelper.NowUnix()
+
+	uniqueId, err := ksuid.NewRandomWithTime(time.Unix(nowUnix, 0))
 	c.errHandler.CatchWithMsg(c.logger, err, "failed to generate instance ID")
 	instanceId := uniqueId.String()
 
@@ -302,7 +338,7 @@ func (c *AwsIdentityCenterController) FinalizeSetup(clientId, startUrl, region, 
 	(instance_id, start_url, region, label, enabled, id_token_enc, access_token_enc, token_type, access_token_created_at,
 		access_token_expires_in, refresh_token_enc, enc_key_id)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	_, err = tx.ExecContext(ctx, sql,
+	_, err = c.db.ExecContext(ctx, sql,
 		instanceId,
 		startUrl,
 		region,
@@ -311,22 +347,28 @@ func (c *AwsIdentityCenterController) FinalizeSetup(clientId, startUrl, region, 
 		idTokenEnc,
 		accessTokenEnc,
 		tokenRes.TokenType,
-		c.timeHelper.NowUnix(),
+		nowUnix,
 		tokenRes.ExpiresIn,
 		refreshTokenEnc,
 		keyId)
 
 	c.errHandler.CatchWithMsg(c.logger, err, "failed to save token to database")
 
-	_, err = tx.ExecContext(ctx, `INSERT INTO favorite_instances (provider_code, instance_id) VALUES (?, ?) `, "aws-iam-idc", instanceId)
-
-	c.errHandler.CatchWithMsg(c.logger, err, "failed to add provider to list of configured providers")
-
-	err = tx.Commit()
-
-	c.errHandler.CatchWithMsg(c.logger, err, "failed to commit transaction")
-
 	return instanceId, nil
+}
+
+func (c *AwsIdentityCenterController) MarkAsFavorite(instanceId string) error {
+	return c.favoritesRepo.Add(c.ctx, &favorites.Favorite{
+		ProviderCode: providers.AwsIamIdc,
+		InstanceId:   instanceId,
+	})
+}
+
+func (c *AwsIdentityCenterController) UnmarkAsFavorite(instanceId string) error {
+	return c.favoritesRepo.Remove(c.ctx, &favorites.Favorite{
+		ProviderCode: providers.AwsIamIdc,
+		InstanceId:   instanceId,
+	})
 }
 
 func (c *AwsIdentityCenterController) RefreshAccessToken(instanceId string) (*AuthorizeDeviceFlowResult, error) {

@@ -2,17 +2,18 @@ package main
 
 import (
 	"context"
-	"database/sql"
 
+	"github.com/abjrcode/swervo/favorites"
 	"github.com/abjrcode/swervo/internal/logging"
+	"github.com/abjrcode/swervo/providers"
 	"github.com/rs/zerolog"
 )
 
 type DashboardController struct {
-	ctx          context.Context
-	logger       *zerolog.Logger
-	errorHandler logging.ErrorHandler
-	db           *sql.DB
+	ctx           context.Context
+	logger        *zerolog.Logger
+	errorHandler  logging.ErrorHandler
+	favoritesRepo favorites.FavoritesRepo
 }
 
 type Provider struct {
@@ -26,21 +27,12 @@ type FavoriteInstance struct {
 	InstanceId   string `json:"instanceId"`
 }
 
-var (
-	SupportedProviders = map[string]Provider{
-		"aws-iam-idc": {
-			Code: "aws-iam-idc",
-			Name: "AWS IAM IDC",
-		},
-	}
-)
-
 var supportedProviders []Provider
 
-func NewDashboardController(db *sql.DB) *DashboardController {
+func NewDashboardController(favoritesRepo favorites.FavoritesRepo) *DashboardController {
 
 	return &DashboardController{
-		db: db,
+		favoritesRepo: favoritesRepo,
 	}
 }
 
@@ -50,35 +42,32 @@ func (c *DashboardController) Init(ctx context.Context, errorHandler logging.Err
 	c.logger = &enrichedLogger
 	c.errorHandler = errorHandler
 
-	supportedProviders = make([]Provider, 0, len(SupportedProviders))
-	for _, provider := range SupportedProviders {
-		supportedProviders = append(supportedProviders, provider)
+	supportedProviders = make([]Provider, 0, len(providers.SupportedProviders))
+	for _, provider := range providers.SupportedProviders {
+		supportedProviders = append(supportedProviders, Provider{
+			Code: provider.Code,
+			Name: provider.Name,
+		})
 	}
 }
 
 func (c *DashboardController) ListFavorites() ([]FavoriteInstance, error) {
-	rows, err := c.db.QueryContext(c.ctx, `SELECT * FROM favorite_instances`)
+	favorites, err := c.favoritesRepo.ListAll(c.ctx)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return []FavoriteInstance{}, nil
-		}
-
 		c.errorHandler.Catch(c.logger, err)
 	}
 
-	favorites := make([]FavoriteInstance, 0, 10)
+	favoriteInstances := make([]FavoriteInstance, 0, len(favorites))
 
-	for rows.Next() {
-		var favorite FavoriteInstance
-		err := rows.Scan(&favorite.ProviderCode, &favorite.InstanceId)
-		if err != nil {
-			c.errorHandler.Catch(c.logger, err)
-		}
-		favorites = append(favorites, favorite)
+	for _, favorite := range favorites {
+		favoriteInstances = append(favoriteInstances, FavoriteInstance{
+			ProviderCode: favorite.ProviderCode,
+			InstanceId:   favorite.InstanceId,
+		})
 	}
 
-	return favorites, nil
+	return favoriteInstances, nil
 }
 
 func (c *DashboardController) ListProviders() []Provider {

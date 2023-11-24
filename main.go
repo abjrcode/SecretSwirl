@@ -10,6 +10,7 @@ import (
 	"os"
 
 	"github.com/abjrcode/swervo/clients/awssso"
+	"github.com/abjrcode/swervo/favorites"
 	"github.com/abjrcode/swervo/internal/config"
 	"github.com/abjrcode/swervo/internal/datastore"
 	"github.com/abjrcode/swervo/internal/logging"
@@ -97,9 +98,11 @@ func main() {
 	defer vault.Seal()
 
 	authController := NewAuthController(vault)
-	dashboardController := NewDashboardController(sqlDb)
 
-	awsIdcController := awsiamidc.NewAwsIdentityCenterController(sqlDb, vault, awssso.NewAwsSsoOidcClient(), timeProvider)
+	favoritesRepo := favorites.NewFavorites(sqlDb, &logger)
+	dashboardController := NewDashboardController(favoritesRepo)
+
+	awsIdcController := awsiamidc.NewAwsIdentityCenterController(sqlDb, favoritesRepo, vault, awssso.NewAwsSsoOidcClient(), timeProvider)
 
 	logger.Info().Msgf("PID [%d] - launching Swervo", os.Getpid())
 	if err := wails.Run(&options.App{

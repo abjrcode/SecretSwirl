@@ -1,9 +1,5 @@
-import { Outlet, useNavigate } from "react-router-dom"
-import {
-  ConfigureVault,
-  UnlockVault,
-  LockVault,
-} from "../../../wailsjs/go/main/AuthController"
+import { Outlet } from "react-router-dom"
+import { ConfigureVault, UnlockVault } from "../../../wailsjs/go/main/AuthController"
 import { Layout } from "../../layout"
 import { useAuth } from "../../auth-provider/auth-context"
 import { VaultBuilder } from "./vault-builder"
@@ -11,7 +7,6 @@ import { VaultDoor } from "./vault-door"
 import { useState } from "react"
 
 export function Vault(props: { isVaultConfigured: boolean }) {
-  const navigate = useNavigate()
   const authContext = useAuth()
 
   const [isVaultConfigured, setIsVaultConfigured] = useState(props.isVaultConfigured)
@@ -31,39 +26,25 @@ export function Vault(props: { isVaultConfigured: boolean }) {
     }
   }
 
-  async function attemptLock() {
-    await LockVault()
-
-    navigate("/")
-    authContext.onVaultLocked()
-  }
-
   if (authContext.isAuthenticated === false) {
     if (isVaultConfigured) {
       return (
-        <Layout>
+        <div className="h-screen flex flex-col justify-center items-center gap-8">
           <VaultDoor verifyCombo={attemptUnlock} />
-        </Layout>
+        </div>
       )
     }
 
     return (
-      <Layout>
+      <div className="h-screen flex flex-col justify-center items-center gap-8">
         <VaultBuilder onBuild={buildVault} />
-      </Layout>
+      </div>
     )
   }
 
   return (
-    <>
-      <button
-        onClick={attemptLock}
-        className="fixed top-5 right-5 btn btn-secondary btn-outline">
-        lock
-      </button>
-      <Layout>
-        <Outlet />
-      </Layout>
-    </>
+    <Layout>
+      <Outlet />
+    </Layout>
   )
 }

@@ -1,6 +1,10 @@
 import React from "react"
-import { useFetcher, useNavigate } from "react-router-dom"
-import { RefreshAccessToken } from "../../../wailsjs/go/awsiamidc/AwsIdentityCenterController"
+import { useFetcher, useNavigate, useRevalidator } from "react-router-dom"
+import {
+  MarkAsFavorite,
+  RefreshAccessToken,
+  UnmarkAsFavorite,
+} from "../../../wailsjs/go/awsiamidc/AwsIdentityCenterController"
 
 import {
   AwsIamIdcCardDataError,
@@ -10,6 +14,7 @@ import {
 export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
   const navigate = useNavigate()
   const fetcher = useFetcher()
+  const validator = useRevalidator()
 
   async function authorizeDevice(instanceId: string) {
     const deviceAuthFlowResult = await RefreshAccessToken(instanceId)
@@ -37,20 +42,51 @@ export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
     }
   }, [instanceId, fetcher])
 
+  async function markAsFavorite() {
+    await MarkAsFavorite(instanceId)
+    validator.revalidate()
+  }
+
+  async function unmarkAsFavorite() {
+    await UnmarkAsFavorite(instanceId)
+    validator.revalidate()
+  }
+
   const cardDataResult = fetcher.data as AwsIamIdcCardDataResult | undefined
 
   if (cardDataResult === undefined) {
-    return <div>Loading...</div>
+    return (
+      <div className="flex flex-col gap-4 items-center w-96">
+        <div className="skeleton h-4 w-full"></div>
+        <div className="skeleton h-48 w-5/6"></div>
+        <div className="skeleton h-4 w-full"></div>
+      </div>
+    )
   }
 
   if (cardDataResult.success) {
     const cardData = cardDataResult.result
 
     return (
-      <div className="card gap-6 px-6 py-4 card-bordered border-secondary bg-base-200 drop-shadow-lg">
+      <div className="card gap-6 px-6 py-4 max-w-lg card-bordered border-secondary bg-base-200 drop-shadow-lg">
         <div
           role="heading"
-          className="card-title justify-between">
+          className="card-title">
+          <button onClick={cardData.isFavorite ? unmarkAsFavorite : markAsFavorite}>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill={cardData.isFavorite ? "currentColor" : "none"}
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+              className="inline-flex w-6 h-6">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"
+              />
+            </svg>
+          </button>
           <h1 className="text-2xl font-semibold">{cardData.label}</h1>
         </div>
         <div className="card-body">

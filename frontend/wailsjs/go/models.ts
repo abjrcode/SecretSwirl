@@ -46,6 +46,7 @@ export namespace awsiamidc {
 	    instanceId: string;
 	    enabled: boolean;
 	    label: string;
+	    isFavorite: boolean;
 	    isAccessTokenExpired: boolean;
 	    accessTokenExpiresIn: string;
 	    accounts: AwsIdentityCenterAccount[];
@@ -59,6 +60,7 @@ export namespace awsiamidc {
 	        this.instanceId = source["instanceId"];
 	        this.enabled = source["enabled"];
 	        this.label = source["label"];
+	        this.isFavorite = source["isFavorite"];
 	        this.isAccessTokenExpired = source["isAccessTokenExpired"];
 	        this.accessTokenExpiresIn = source["accessTokenExpiresIn"];
 	        this.accounts = this.convertValues(source["accounts"], AwsIdentityCenterAccount);
