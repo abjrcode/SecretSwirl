@@ -10,8 +10,8 @@ export function FinalizeSetup(arg1, arg2, arg3, arg4, arg5, arg6) {
   return window['go']['awsiamidc']['AwsIdentityCenterController']['FinalizeSetup'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
-export function GetInstanceData(arg1) {
-  return window['go']['awsiamidc']['AwsIdentityCenterController']['GetInstanceData'](arg1);
+export function GetInstanceData(arg1, arg2) {
+  return window['go']['awsiamidc']['AwsIdentityCenterController']['GetInstanceData'](arg1, arg2);
 }
 
 export function Init(arg1, arg2) {
