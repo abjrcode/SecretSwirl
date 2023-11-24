@@ -76,6 +76,13 @@ type AwsIdentityCenterAccount struct {
 	Roles       []AwsIdentityCenterAccountRole `json:"roles"`
 }
 
+type AwsIdentityCenterAccountRoleCredentials struct {
+	AccessKeyId     string `json:"accessKeyId"`
+	SecretAccessKey string `json:"secretAccessKey"`
+	SessionToken    string `json:"sessionToken"`
+	Expiration      int64  `json:"expiration"`
+}
+
 type AwsIdentityCenterCardData struct {
 	InstanceId           string                     `json:"instanceId"`
 	Enabled              bool                       `json:"enabled"`
@@ -232,6 +239,43 @@ func (c *AwsIdentityCenterController) GetInstanceData(instanceId string, forceRe
 		IsAccessTokenExpired: false,
 		AccessTokenExpiresIn: humanize.Time(time.Unix(accessTokenCreatedAt+accessTokenExpiresIn, 0)),
 		Accounts:             accounts,
+	}, nil
+}
+
+func (c *AwsIdentityCenterController) GetRoleCredentials(instanceId, accountId, roleName string) (*AwsIdentityCenterAccountRoleCredentials, error) {
+	row := c.db.QueryRowContext(c.ctx, "SELECT region, access_token_enc, access_token_created_at, access_token_expires_in, enc_key_id FROM aws_iam_idc_instances WHERE instance_id = ?", instanceId)
+
+	var region string
+	var accessTokenEnc string
+	var accessTokenCreatedAt int64
+	var accessTokenExpiresIn int64
+	var encKeyId string
+
+	if err := row.Scan(&region, &accessTokenEnc, &accessTokenCreatedAt, &accessTokenExpiresIn, &encKeyId); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrInstanceWasNotFound
+		}
+
+		c.errHandler.Catch(c.logger, err)
+	}
+
+	accessToken, err := c.encryptionService.Decrypt(accessTokenEnc, encKeyId)
+
+	c.errHandler.CatchWithMsg(c.logger, err, "failed to decrypt access token")
+
+	ctx := context.WithValue(c.ctx, awssso.AwsRegion("awsRegion"), region)
+	res, err := c.awsSsoClient.GetRoleCredentials(ctx, accountId, roleName, accessToken)
+
+	if err != nil {
+		c.logger.Error().Err(err).Msg("failed to get role credentials")
+		c.errHandler.Catch(c.logger, err)
+	}
+
+	return &AwsIdentityCenterAccountRoleCredentials{
+		AccessKeyId:     res.AccessKeyId,
+		SecretAccessKey: res.SecretAccessKey,
+		SessionToken:    res.SessionToken,
+		Expiration:      res.Expiration,
 	}, nil
 }
 
