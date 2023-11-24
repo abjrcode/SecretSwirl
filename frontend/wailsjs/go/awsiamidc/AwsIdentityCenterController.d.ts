@@ -12,8 +12,12 @@ export function GetInstanceData(arg1:string):Promise<awsiamidc.AwsIdentityCenter
 
 export function Init(arg1:context.Context,arg2:logging.ErrorHandler):Promise<void>;
 
-export function ListInstances():Promise<Array<awsiamidc.AwsIdentityCenterCardData>>;
+export function ListInstances():Promise<Array<string>>;
+
+export function MarkAsFavorite(arg1:string):Promise<void>;
 
 export function RefreshAccessToken(arg1:string):Promise<awsiamidc.AuthorizeDeviceFlowResult>;
 
 export function Setup(arg1:string,arg2:string,arg3:string):Promise<awsiamidc.AuthorizeDeviceFlowResult>;
+
+export function UnmarkAsFavorite(arg1:string):Promise<void>;

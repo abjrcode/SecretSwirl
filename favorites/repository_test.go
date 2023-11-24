@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/abjrcode/swervo/internal/migrations"
+	"github.com/abjrcode/swervo/providers"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
@@ -17,7 +18,7 @@ func TestAddFavorite(t *testing.T) {
 	repo := NewFavorites(db, &logger)
 
 	favorite := &Favorite{
-		ProviderCode: "aws-iam-idc",
+		ProviderCode: providers.AwsIamIdc,
 		InstanceId:   "some-nice-id",
 	}
 
@@ -42,7 +43,7 @@ func TestRemoveFavorite(t *testing.T) {
 	ctx := context.Background()
 
 	favorite := &Favorite{
-		ProviderCode: "aws-iam-idc",
+		ProviderCode: providers.AwsIamIdc,
 		InstanceId:   "some-nice-id",
 	}
 
@@ -62,4 +63,33 @@ func TestRemoveFavorite(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, favorites, 0)
+}
+
+func TestIsFavorite(t *testing.T) {
+	db, err := migrations.NewInMemoryMigratedDatabase(t, "favorites-repo-tests.db")
+	require.NoError(t, err)
+
+	logger := zerolog.Nop()
+
+	repo := NewFavorites(db, &logger)
+	ctx := context.Background()
+
+	favorite := &Favorite{
+		ProviderCode: providers.AwsIamIdc,
+		InstanceId:   "some-nice-id",
+	}
+
+	err = repo.Add(ctx, favorite)
+	require.NoError(t, err)
+
+	isFavorite, err := repo.IsFavorite(ctx, favorite)
+	require.NoError(t, err)
+	require.True(t, isFavorite)
+
+	isFavorite, err = repo.IsFavorite(ctx, &Favorite{
+		ProviderCode: providers.AwsIamIdc,
+		InstanceId:   "some-nice-id-2",
+	})
+	require.NoError(t, err)
+	require.False(t, isFavorite)
 }

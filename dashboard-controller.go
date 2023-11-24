@@ -5,6 +5,7 @@ import (
 
 	"github.com/abjrcode/swervo/favorites"
 	"github.com/abjrcode/swervo/internal/logging"
+	"github.com/abjrcode/swervo/providers"
 	"github.com/rs/zerolog"
 )
 
@@ -26,15 +27,6 @@ type FavoriteInstance struct {
 	InstanceId   string `json:"instanceId"`
 }
 
-var (
-	SupportedProviders = map[string]Provider{
-		"aws-iam-idc": {
-			Code: "aws-iam-idc",
-			Name: "AWS IAM IDC",
-		},
-	}
-)
-
 var supportedProviders []Provider
 
 func NewDashboardController(favoritesRepo favorites.FavoritesRepo) *DashboardController {
@@ -50,9 +42,12 @@ func (c *DashboardController) Init(ctx context.Context, errorHandler logging.Err
 	c.logger = &enrichedLogger
 	c.errorHandler = errorHandler
 
-	supportedProviders = make([]Provider, 0, len(SupportedProviders))
-	for _, provider := range SupportedProviders {
-		supportedProviders = append(supportedProviders, provider)
+	supportedProviders = make([]Provider, 0, len(providers.SupportedProviders))
+	for _, provider := range providers.SupportedProviders {
+		supportedProviders = append(supportedProviders, Provider{
+			Code: provider.Code,
+			Name: provider.Name,
+		})
 	}
 }
 

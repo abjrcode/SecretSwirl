@@ -22,10 +22,18 @@ export function ListInstances() {
   return window['go']['awsiamidc']['AwsIdentityCenterController']['ListInstances']();
 }
 
+export function MarkAsFavorite(arg1) {
+  return window['go']['awsiamidc']['AwsIdentityCenterController']['MarkAsFavorite'](arg1);
+}
+
 export function RefreshAccessToken(arg1) {
   return window['go']['awsiamidc']['AwsIdentityCenterController']['RefreshAccessToken'](arg1);
 }
 
 export function Setup(arg1, arg2, arg3) {
   return window['go']['awsiamidc']['AwsIdentityCenterController']['Setup'](arg1, arg2, arg3);
+}
+
+export function UnmarkAsFavorite(arg1) {
+  return window['go']['awsiamidc']['AwsIdentityCenterController']['UnmarkAsFavorite'](arg1);
 }

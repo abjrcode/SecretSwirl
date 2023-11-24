@@ -102,7 +102,7 @@ func main() {
 	favoritesRepo := favorites.NewFavorites(sqlDb, &logger)
 	dashboardController := NewDashboardController(favoritesRepo)
 
-	awsIdcController := awsiamidc.NewAwsIdentityCenterController(sqlDb, vault, awssso.NewAwsSsoOidcClient(), timeProvider)
+	awsIdcController := awsiamidc.NewAwsIdentityCenterController(sqlDb, favoritesRepo, vault, awssso.NewAwsSsoOidcClient(), timeProvider)
 
 	logger.Info().Msgf("PID [%d] - launching Swervo", os.Getpid())
 	if err := wails.Run(&options.App{

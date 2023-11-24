@@ -1,9 +1,8 @@
 import { Link, useLoaderData } from "react-router-dom"
-import { awsiamidc } from "../../../wailsjs/go/models"
 import { AwsIamIdcCard } from "./aws-iam-idc-card"
 
 export function AwsIamIdcInstances() {
-  const loader = useLoaderData() as awsiamidc.AwsIdentityCenterCardData[] | undefined
+  const loader = useLoaderData() as string[] | undefined
 
   if (!loader) {
     return null
@@ -18,8 +17,8 @@ export function AwsIamIdcInstances() {
 
       <ul className="flex gap-4">
         {loader.map((instance) => (
-          <li key={instance.instanceId}>
-            <AwsIamIdcCard instanceId={instance.instanceId} />
+          <li key={instance}>
+            <AwsIamIdcCard instanceId={instance} />
           </li>
         ))}
 
