@@ -68,6 +68,84 @@ type AwsIdentityCenterCardData struct {
 	Accounts             []AwsIdentityCenterAccount `json:"accounts"`
 }
 
+func (c *AwsIdentityCenterController) ListInstances() ([]*AwsIdentityCenterCardData, error) {
+	rows, err := c.db.QueryContext(c.ctx, "SELECT instance_id, region, label, access_token_enc, access_token_created_at, access_token_expires_in, enc_key_id FROM aws_iam_idc_instances")
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return make([]*AwsIdentityCenterCardData, 0), nil
+		}
+
+		c.errHandler.Catch(c.logger, err)
+	}
+
+	instances := make([]*AwsIdentityCenterCardData, 0)
+
+	for rows.Next() {
+		var instanceId string
+		var region string
+		var label string
+		var accessTokenEnc string
+		var accessTokenCreatedAt int64
+		var accessTokenExpiresIn int64
+		var encKeyId string
+
+		if err := rows.Scan(&instanceId, &region, &label, &accessTokenEnc, &accessTokenCreatedAt, &accessTokenExpiresIn, &encKeyId); err != nil {
+			c.errHandler.Catch(c.logger, err)
+		}
+
+		now := c.timeHelper.NowUnix()
+
+		if now > accessTokenCreatedAt+accessTokenExpiresIn {
+			c.logger.Info().Msgf("token for instance [%s] has expired", instanceId)
+
+			instances = append(instances, &AwsIdentityCenterCardData{
+				Enabled:              true,
+				InstanceId:           instanceId,
+				Label:                label,
+				IsAccessTokenExpired: true,
+				AccessTokenExpiresIn: humanize.Time(time.Unix(accessTokenCreatedAt+accessTokenExpiresIn, 0)),
+				Accounts:             make([]AwsIdentityCenterAccount, 0),
+			})
+
+			continue
+		}
+
+		accessToken, err := c.encryptionService.Decrypt(accessTokenEnc, encKeyId)
+
+		c.errHandler.CatchWithMsg(c.logger, err, "failed to decrypt access token")
+
+		ctx := context.WithValue(c.ctx, awssso.AwsRegion("awsRegion"), region)
+		accountsOut, err := c.awsSsoClient.ListAccounts(ctx, accessToken)
+
+		if err != nil {
+			c.logger.Error().Err(err).Msg("aws sso client failed to list accounts")
+
+			return nil, ErrTransientAwsClientError
+		}
+
+		accounts := make([]AwsIdentityCenterAccount, 0)
+
+		for _, account := range accountsOut.Accounts {
+			accounts = append(accounts, AwsIdentityCenterAccount{
+				AccountId:   account.AccountId,
+				AccountName: account.AccountName,
+			})
+		}
+
+		instances = append(instances, &AwsIdentityCenterCardData{
+			Enabled:              true,
+			InstanceId:           instanceId,
+			Label:                label,
+			IsAccessTokenExpired: false,
+			AccessTokenExpiresIn: humanize.Time(time.Unix(accessTokenCreatedAt+accessTokenExpiresIn, 0)),
+			Accounts:             accounts,
+		})
+	}
+
+	return instances, nil
+}
+
 func (c *AwsIdentityCenterController) GetInstanceData(instanceId string) (*AwsIdentityCenterCardData, error) {
 	row := c.db.QueryRowContext(c.ctx, "SELECT region, label, access_token_enc, access_token_created_at, access_token_expires_in, enc_key_id FROM aws_iam_idc_instances WHERE instance_id = ?", instanceId)
 

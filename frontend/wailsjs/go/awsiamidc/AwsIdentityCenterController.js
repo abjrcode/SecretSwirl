@@ -18,6 +18,10 @@ export function Init(arg1, arg2) {
   return window['go']['awsiamidc']['AwsIdentityCenterController']['Init'](arg1, arg2);
 }
 
+export function ListInstances() {
+  return window['go']['awsiamidc']['AwsIdentityCenterController']['ListInstances']();
+}
+
 export function RefreshAccessToken(arg1) {
   return window['go']['awsiamidc']['AwsIdentityCenterController']['RefreshAccessToken'](arg1);
 }

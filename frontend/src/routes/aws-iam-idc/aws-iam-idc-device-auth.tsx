@@ -79,7 +79,7 @@ export function AwsIamIdcDeviceAuth() {
   return (
     <Form
       method="post"
-      className="flex flex-col gap-4 border-2 p-6">
+      className="h-screen flex flex-col items-center justify-center gap-4 border-2 p-6">
       <p>
         Please authorize the request by visiting{" "}
         <ExternalLink

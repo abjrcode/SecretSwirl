@@ -76,6 +76,22 @@ module.exports = {
             transform: "translate3d(-110%, 0, 0)",
           },
         },
+        slideInRight: {
+          from: {
+            transform: "translate3d(100%, 0, 0)",
+          },
+          to: {
+            transform: "translate3d(0, 0, 0)",
+          },
+        },
+        slideOutRight: {
+          from: {
+            transform: "translate3d(0, 0, 0)",
+          },
+          to: {
+            transform: "translate3d(110%, 0, 0)",
+          },
+        },
       },
       animation: {
         wiggle: "wiggle 1s ease-in-out infinite",

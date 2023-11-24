@@ -19,6 +19,8 @@ import { WailsProvider } from "./wails-provider/wails-provider"
 import { AwsIamIdcDeviceAuth } from "./routes/aws-iam-idc/aws-iam-idc-device-auth"
 import { awsIamIdcDeviceAuthAction } from "./routes/aws-iam-idc/aws-iam-idc-device-auth-data"
 import { ToastProvider } from "./toast-provider/toast-provider"
+import { AwsIamIdcInstances } from "./routes/aws-iam-idc/aws-iam-idc-instances"
+import { awsIamIdcInstancesData } from "./routes/aws-iam-idc/aws-iam-idc-instances-data"
 
 const devMode = import.meta.env.DEV
 
@@ -47,6 +49,11 @@ void (async function main() {
             {
               path: "aws-iam-idc",
               children: [
+                {
+                  index: true,
+                  element: <AwsIamIdcInstances />,
+                  loader: awsIamIdcInstancesData,
+                },
                 {
                   path: "setup",
                   element: <AwsIamIdcSetup />,
