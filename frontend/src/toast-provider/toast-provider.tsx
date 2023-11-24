@@ -9,7 +9,7 @@ import { Toast } from "../components/toast"
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const MaxToasts = 3
-  const DefaultToastDuration = 3000
+  const DefaultToastDuration = 2000
   const toastId = useRef(1)
 
   const toastQueue = useRef<ToastSpec[]>([])
@@ -28,7 +28,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       toastQueue.current.push(toast)
     }
 
-    if (notifyContainer.current) notifyContainer.current(toasts.current)
+    if (notifyContainer.current) notifyContainer.current([...toasts.current])
   }
 
   function removeToast(id: string) {
@@ -47,7 +47,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       toasts.current = toasts.current.filter((toast) => toast.key !== id)
     }
 
-    if (notifyContainer.current) notifyContainer.current(toasts.current)
+    if (notifyContainer.current) notifyContainer.current([...toasts.current])
   }
 
   function showInfo(opts: string | ToastOptions) {
