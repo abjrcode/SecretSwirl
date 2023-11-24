@@ -12,7 +12,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<React.ReactElement[]>([])
 
   function updateToasts(toasts: React.ReactElement[]) {
-    setToasts(toasts)
+    setToasts([...toasts])
   }
 
   useEffect(() => {

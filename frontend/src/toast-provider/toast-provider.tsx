@@ -9,7 +9,7 @@ import { Toast } from "../components/toast"
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const MaxToasts = 3
-  const DefaultToastDuration = 3000
+  const DefaultToastDuration = 2000
   const toastId = useRef(1)
 
   const toastQueue = useRef<ToastSpec[]>([])
