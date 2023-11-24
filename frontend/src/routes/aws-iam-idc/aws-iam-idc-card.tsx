@@ -129,28 +129,22 @@ export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
                       {account.accountName} ({account.accountId})
                     </h3>
                     <ul className="list-inside space-y-2 list-disc pl-4">
-                      <li>
-                        <span>Admin</span>
-                        <div className="inline-flex gap-2">
-                          <button className="btn btn-secondary btn-outline btn-xs">
-                            copy credentials
-                          </button>
-                          <a className="link link-secondary"> Management console </a>
-                        </div>
-                      </li>
-                      <li>
-                        <span>Viewer</span>
-                        <div className="inline-flex gap-2">
-                          <button className="btn btn-secondary btn-outline btn-xs">
-                            copy credentials
-                          </button>
-                          <a className="link link-secondary"> Management console </a>
-                        </div>
-                      </li>
+                      {account.roles.map((role) => (
+                        <li
+                          key={role.roleName}
+                          className="inline-flex items-center gap-2">
+                          <span>{role.roleName}</span>
+                          <div className="inline-flex gap-2">
+                            <button className="btn btn-accent btn-xs">
+                              copy credentials
+                            </button>
+                          </div>
+                        </li>
+                      ))}
                     </ul>
                   </li>
                 ))}
-              </ul>{" "}
+              </ul>
             </>
           )}
 
