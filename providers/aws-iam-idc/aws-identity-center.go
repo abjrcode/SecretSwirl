@@ -1,8 +1,10 @@
 package awsiamidc
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"net/url"
@@ -14,6 +16,7 @@ import (
 	"github.com/abjrcode/swervo/internal/security/encryption"
 	"github.com/abjrcode/swervo/internal/utils"
 	"github.com/abjrcode/swervo/providers"
+	"github.com/coocood/freecache"
 	"github.com/dustin/go-humanize"
 	"github.com/rs/zerolog"
 	"github.com/segmentio/ksuid"
@@ -39,15 +42,20 @@ type AwsIdentityCenterController struct {
 	encryptionService encryption.EncryptionService
 	awsSsoClient      awssso.AwsSsoOidcClient
 	timeHelper        utils.Clock
+	cache             *freecache.Cache
 }
 
 func NewAwsIdentityCenterController(db *sql.DB, favoritesRepo favorites.FavoritesRepo, encryptionService encryption.EncryptionService, awsSsoClient awssso.AwsSsoOidcClient, datetime utils.Clock) *AwsIdentityCenterController {
+	fiveHundredTwelveKilobytes := 512 * 1024
+	cache := freecache.NewCache(fiveHundredTwelveKilobytes)
+
 	return &AwsIdentityCenterController{
 		db:                db,
 		favoritesRepo:     favoritesRepo,
 		encryptionService: encryptionService,
 		awsSsoClient:      awsSsoClient,
 		timeHelper:        datetime,
+		cache:             cache,
 	}
 }
 
@@ -99,7 +107,7 @@ func (c *AwsIdentityCenterController) ListInstances() ([]string, error) {
 	return instances, nil
 }
 
-func (c *AwsIdentityCenterController) GetInstanceData(instanceId string) (*AwsIdentityCenterCardData, error) {
+func (c *AwsIdentityCenterController) GetInstanceData(instanceId string, forceRefresh bool) (*AwsIdentityCenterCardData, error) {
 	row := c.db.QueryRowContext(c.ctx, "SELECT region, label, access_token_enc, access_token_created_at, access_token_expires_in, enc_key_id FROM aws_iam_idc_instances WHERE instance_id = ?", instanceId)
 
 	var region string
@@ -139,10 +147,39 @@ func (c *AwsIdentityCenterController) GetInstanceData(instanceId string) (*AwsId
 		}, nil
 	}
 
+	if !forceRefresh {
+		got, err := c.cache.Get([]byte(instanceId))
+
+		if err == nil {
+			c.logger.Info().Msgf("cache hit for instance [%s]", instanceId)
+
+			var accounts []AwsIdentityCenterAccount
+			buffer := bytes.NewBuffer(got)
+
+			err = gob.NewDecoder(buffer).Decode(&accounts)
+
+			if err != nil {
+				c.logger.Error().Err(err).Msg("failed to decode accounts from cache")
+				c.errHandler.Catch(c.logger, err)
+			}
+
+			return &AwsIdentityCenterCardData{
+				Enabled:              true,
+				InstanceId:           instanceId,
+				Label:                label,
+				IsFavorite:           isFavorite,
+				IsAccessTokenExpired: false,
+				AccessTokenExpiresIn: humanize.Time(time.Unix(accessTokenCreatedAt+accessTokenExpiresIn, 0)),
+				Accounts:             accounts,
+			}, nil
+		}
+	}
+
 	accessToken, err := c.encryptionService.Decrypt(accessTokenEnc, encKeyId)
 
 	c.errHandler.CatchWithMsg(c.logger, err, "failed to decrypt access token")
 
+	c.logger.Debug().Msgf("fetching accounts for instance [%s] with refresh=%t", instanceId, forceRefresh)
 	ctx := context.WithValue(c.ctx, awssso.AwsRegion("awsRegion"), region)
 	accountsOut, err := c.awsSsoClient.ListAccounts(ctx, accessToken)
 
@@ -151,6 +188,18 @@ func (c *AwsIdentityCenterController) GetInstanceData(instanceId string) (*AwsId
 
 		return nil, ErrTransientAwsClientError
 	}
+
+	buffer := bytes.NewBuffer([]byte{})
+
+	err = gob.NewEncoder(buffer).Encode(accountsOut.Accounts)
+
+	if err != nil {
+		c.logger.Error().Err(err).Msg("failed to encode accounts to cache")
+		c.errHandler.Catch(c.logger, err)
+	}
+
+	cacheTtl := accessTokenCreatedAt + accessTokenExpiresIn - now
+	c.cache.Set([]byte(instanceId), buffer.Bytes(), int(cacheTtl))
 
 	accounts := make([]AwsIdentityCenterAccount, 0)
 

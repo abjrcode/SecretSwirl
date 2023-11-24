@@ -11,13 +11,14 @@ export type AwsIamIdcCardDataResult = ActionDataResult<awsiamidc.AwsIdentityCent
 
 export async function awsIamIdcCardLoader({ request }: { request: Request }): Promise<AwsIamIdcCardDataResult> {
   const instanceId = new URL(request.url).searchParams.get('instanceId')
+  const refresh = new URL(request.url).searchParams.get('refresh') === 'true'
 
   if (!instanceId) {
     throw new Response('instanceId is required', { status: 400 })
   }
 
   try {
-    return { success: true, result: await GetInstanceData(instanceId) }
+    return { success: true, result: await GetInstanceData(instanceId, refresh) }
   }
   catch (error) {
     switch (error) {
