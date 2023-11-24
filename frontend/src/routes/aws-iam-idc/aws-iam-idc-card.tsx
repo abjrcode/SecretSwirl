@@ -1,6 +1,7 @@
 import React from "react"
 import { useFetcher, useNavigate, useRevalidator } from "react-router-dom"
 import {
+  GetRoleCredentials,
   MarkAsFavorite,
   RefreshAccessToken,
   UnmarkAsFavorite,
@@ -10,8 +11,12 @@ import {
   AwsIamIdcCardDataError,
   AwsIamIdcCardDataResult,
 } from "./aws-iam-idc-card-data"
+import { useWails } from "../../wails-provider/wails-context"
+import { useToaster } from "../../toast-provider/toast-context"
 
 export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
+  const wails = useWails()
+  const toaster = useToaster()
   const navigate = useNavigate()
   const fetcher = useFetcher()
   const validator = useRevalidator()
@@ -59,6 +64,22 @@ export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
   async function unmarkAsFavorite() {
     await UnmarkAsFavorite(instanceId)
     validator.revalidate()
+  }
+
+  async function copyCredentials(
+    instanceId: string,
+    accountId: string,
+    roleName: string,
+  ) {
+    const output = await GetRoleCredentials(instanceId, accountId, roleName)
+    const credentialsProfile = `
+    [default]
+    aws_access_key_id = ${output.accessKeyId}
+    aws_secret_access_key = ${output.secretAccessKey}
+    aws_session_token = ${output.sessionToken}
+    `
+    await wails.runtime.ClipboardSetText(credentialsProfile)
+    toaster.showSuccess("Copied credentials to clipboard!")
   }
 
   const cardDataResult = fetcher.data as AwsIamIdcCardDataResult | undefined
@@ -135,7 +156,15 @@ export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
                           className="inline-flex items-center gap-2">
                           <span>{role.roleName}</span>
                           <div className="inline-flex gap-2">
-                            <button className="btn btn-accent btn-xs">
+                            <button
+                              onClick={() =>
+                                copyCredentials(
+                                  instanceId,
+                                  account.accountId,
+                                  role.roleName,
+                                )
+                              }
+                              className="btn btn-accent btn-xs">
                               copy credentials
                             </button>
                           </div>

@@ -75,6 +75,11 @@ type ListAccountsResponse struct {
 	Accounts []AwsAccount
 }
 
+type GetRoleCredentialsResponse struct {
+	AccessKeyId, SecretAccessKey, SessionToken string
+	Expiration                                 int64
+}
+
 type AwsSsoOidcClient interface {
 	RegisterClient(ctx context.Context, friendlyClientName string) (*RegistrationResponse, error)
 
@@ -83,6 +88,8 @@ type AwsSsoOidcClient interface {
 	CreateToken(ctx context.Context, clientId, clientSecret, userCode, deviceCode string) (*GetTokenResponse, error)
 
 	ListAccounts(ctx context.Context, accessToken string) (*ListAccountsResponse, error)
+
+	GetRoleCredentials(ctx context.Context, accountId, roleName, accessToken string) (*GetRoleCredentialsResponse, error)
 }
 
 type awsSsoClientImpl struct {
@@ -224,5 +231,26 @@ func (c *awsSsoClientImpl) ListAccounts(ctx context.Context, accessToken string)
 
 	return &ListAccountsResponse{
 		Accounts: accounts,
+	}, nil
+}
+
+func (c *awsSsoClientImpl) GetRoleCredentials(ctx context.Context, accountId, roleName, accessToken string) (*GetRoleCredentialsResponse, error) {
+	output, err := c.ssoClient.GetRoleCredentials(ctx, &sso.GetRoleCredentialsInput{
+		AccountId:   aws.String(accountId),
+		RoleName:    aws.String(roleName),
+		AccessToken: aws.String(accessToken),
+	}, func(options *sso.Options) {
+		options.Region = ctx.Value(AwsRegion("awsRegion")).(string)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &GetRoleCredentialsResponse{
+		AccessKeyId:     *output.RoleCredentials.AccessKeyId,
+		SecretAccessKey: *output.RoleCredentials.SecretAccessKey,
+		SessionToken:    *output.RoleCredentials.SessionToken,
+		Expiration:      output.RoleCredentials.Expiration,
 	}, nil
 }

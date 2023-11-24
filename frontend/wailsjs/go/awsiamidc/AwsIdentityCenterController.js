@@ -14,6 +14,10 @@ export function GetInstanceData(arg1, arg2) {
   return window['go']['awsiamidc']['AwsIdentityCenterController']['GetInstanceData'](arg1, arg2);
 }
 
+export function GetRoleCredentials(arg1, arg2, arg3) {
+  return window['go']['awsiamidc']['AwsIdentityCenterController']['GetRoleCredentials'](arg1, arg2, arg3);
+}
+
 export function Init(arg1, arg2) {
   return window['go']['awsiamidc']['AwsIdentityCenterController']['Init'](arg1, arg2);
 }

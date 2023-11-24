@@ -75,6 +75,24 @@ export namespace awsiamidc {
 		}
 	}
 	
+	export class AwsIdentityCenterAccountRoleCredentials {
+	    accessKeyId: string;
+	    secretAccessKey: string;
+	    sessionToken: string;
+	    expiration: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AwsIdentityCenterAccountRoleCredentials(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.accessKeyId = source["accessKeyId"];
+	        this.secretAccessKey = source["secretAccessKey"];
+	        this.sessionToken = source["sessionToken"];
+	        this.expiration = source["expiration"];
+	    }
+	}
 	export class AwsIdentityCenterCardData {
 	    instanceId: string;
 	    enabled: boolean;
