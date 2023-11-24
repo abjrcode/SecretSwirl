@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/abjrcode/swervo/clients/awssso"
+	"github.com/abjrcode/swervo/favorites"
 	"github.com/abjrcode/swervo/internal/migrations"
 	"github.com/abjrcode/swervo/internal/security/vault"
 	"github.com/abjrcode/swervo/internal/testhelpers"
@@ -43,19 +44,19 @@ func (m *mockAwsSsoOidcClient) ListAccounts(ctx context.Context, accessToken str
 
 func initController(t *testing.T) (*AwsIdentityCenterController, *mockAwsSsoOidcClient, *testhelpers.MockClock) {
 	db, err := migrations.NewInMemoryMigratedDatabase(t, "aws-iam-idc-controller-tests.db")
-
 	require.NoError(t, err)
 
 	awsClient := new(mockAwsSsoOidcClient)
 	mockDatetime := testhelpers.NewMockClock()
 	logger := zerolog.Nop()
+	favoritesRepo := favorites.NewFavorites(db, &logger)
 	errHandler := testhelpers.NewMockErrorHandler(t)
 	ctx := logger.WithContext(context.Background())
 	vault := vault.NewVault(db, mockDatetime, &logger, errHandler)
 	timeSetCall := mockDatetime.On("NowUnix").Return(1)
 	err = vault.Configure(context.Background(), "abc")
 	require.NoError(t, err)
-	controller := NewAwsIdentityCenterController(db, vault, awsClient, mockDatetime)
+	controller := NewAwsIdentityCenterController(db, favoritesRepo, vault, awsClient, mockDatetime)
 	controller.Init(ctx, errHandler)
 
 	timeSetCall.Unset()
@@ -63,9 +64,7 @@ func initController(t *testing.T) (*AwsIdentityCenterController, *mockAwsSsoOidc
 	return controller, awsClient, mockDatetime
 }
 
-func simulateSuccessfulSetup(t *testing.T, startUrl, region string) (string, *AwsIdentityCenterController, *mockAwsSsoOidcClient, *testhelpers.MockClock) {
-	controller, mockAws, mockTimeProvider := initController(t)
-
+func simulateSuccessfulSetup(t *testing.T, controller *AwsIdentityCenterController, mockAws *mockAwsSsoOidcClient, mockTimeProvider *testhelpers.MockClock, startUrl, region, label string) string {
 	mockRegRes := awssso.RegistrationResponse{
 		ClientId:     "test-client-id",
 		ClientSecret: "test-client-secret",
@@ -82,7 +81,8 @@ func simulateSuccessfulSetup(t *testing.T, startUrl, region string) (string, *Aw
 	}
 	deviceAuthCall := mockAws.On("StartDeviceAuthorization", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockAuthRes, nil)
 
-	setupResult, err := controller.Setup(startUrl, region, "test-label")
+	mockTimeProvider.On("NowUnix").Once().Return(1)
+	setupResult, err := controller.Setup(startUrl, region, label)
 	require.NoError(t, err)
 
 	mockTokenRes := awssso.GetTokenResponse{
@@ -105,7 +105,7 @@ func simulateSuccessfulSetup(t *testing.T, startUrl, region string) (string, *Aw
 	createTokenCall.Unset()
 	timeSetCall.Unset()
 
-	return instanceId, controller, mockAws, mockTimeProvider
+	return instanceId
 }
 
 func TestNewAccountSetupErrorInvalidStartUrl(t *testing.T) {
@@ -127,7 +127,7 @@ func TestNewAccountSetupErrorInvalidRegion(t *testing.T) {
 func TestNewAccountSetup_Error_InvalidLabel(t *testing.T) {
 	controller, _, _ := initController(t)
 
-	_, err := controller.Setup("https://test-start-url.aws-apps.com/start", "region_mars", "")
+	_, err := controller.Setup("https://test-start-url.aws-apps.com/start", "region_mars", "i_am_a_very_long_label_that_is_longer_than_50_characters_and_therefore_invalid")
 
 	require.Error(t, err, ErrInvalidLabel)
 }
@@ -197,7 +197,7 @@ func TestNewAccount_FullSetup_Success(t *testing.T) {
 	require.Equal(t, setupResult, &AuthorizeDeviceFlowResult{
 		StartUrl:        "https://test-start-url.aws-apps.com/start",
 		Region:          "eu-west-1",
-		Label:           "test_label",
+		Label:           label,
 		ClientId:        "test-client-id",
 		UserCode:        "test-user-code",
 		DeviceCode:      "test-device-code",
@@ -211,7 +211,9 @@ func TestNewAccountSetupErrorDoubleRegistration(t *testing.T) {
 	region := "eu-west-1"
 	label := "test_label"
 
-	_, controller, _, _ := simulateSuccessfulSetup(t, startUrl, region)
+	controller, mockAws, mockTimeProvider := initController(t)
+
+	_ = simulateSuccessfulSetup(t, controller, mockAws, mockTimeProvider, startUrl, region, label)
 
 	_, err := controller.Setup(startUrl, region, label)
 	require.Error(t, err, ErrInstanceAlreadyRegistered)
@@ -354,11 +356,61 @@ func TestFinalizeSetup_Error_DeviceAuthTimeout(t *testing.T) {
 	require.Error(t, err, ErrDeviceAuthFlowTimedOut)
 }
 
+func TestListInstances(t *testing.T) {
+	startUrl := "https://test-start-url.aws-apps.com/start"
+	region := "eu-west-1"
+	label := "test_label"
+
+	controller, mockAws, mockTimeProvider := initController(t)
+
+	instanceId := simulateSuccessfulSetup(t, controller, mockAws, mockTimeProvider, startUrl, region, label)
+
+	startUrl2 := "https://test-start-url-2.aws-apps.com/start"
+	region2 := "eu-west-2"
+	label2 := "test_label_2"
+
+	mockAuthRes := awssso.AuthorizationResponse{
+		DeviceCode:              "test-device-code",
+		UserCode:                "test-user-code",
+		VerificationUriComplete: "https://test-verification-url",
+		ExpiresIn:               10,
+	}
+	mockAws.On("StartDeviceAuthorization", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once().Return(&mockAuthRes, nil)
+
+	mockTimeProvider.On("NowUnix").Once().Return(2)
+	setupResult, err := controller.Setup(startUrl2, region2, label2)
+	require.NoError(t, err)
+
+	mockTokenRes := awssso.GetTokenResponse{
+		IdToken:      "test-id-token",
+		AccessToken:  "test-access-token",
+		RefreshToken: "test-refresh-token",
+		TokenType:    "test-token-type",
+		ExpiresIn:    5,
+	}
+	mockAws.On("CreateToken", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once().Return(&mockTokenRes, nil)
+
+	tokenCreatedAt := 3
+	mockTimeProvider.On("NowUnix").Once().Return(tokenCreatedAt)
+
+	instanceId2, err := controller.FinalizeSetup(setupResult.ClientId, setupResult.StartUrl, setupResult.Region, setupResult.Label, setupResult.UserCode, setupResult.DeviceCode)
+	require.NoError(t, err)
+
+	instances, err := controller.ListInstances()
+
+	require.NoError(t, err)
+
+	require.Equal(t, instances, []string{instanceId2, instanceId})
+}
+
 func TestGetInstanceData(t *testing.T) {
 	startUrl := "https://test-start-url.aws-apps.com/start"
 	region := "eu-west-1"
+	label := "test_label"
 
-	instanceId, controller, mockAws, mockTimeProvider := simulateSuccessfulSetup(t, startUrl, region)
+	controller, mockAws, mockTimeProvider := initController(t)
+
+	instanceId := simulateSuccessfulSetup(t, controller, mockAws, mockTimeProvider, startUrl, region, label)
 
 	mockTimeProvider.On("NowUnix").Return(3)
 
@@ -382,7 +434,8 @@ func TestGetInstanceData(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, instanceId, instanceData.InstanceId)
-	require.Equal(t, "test-label", instanceData.Label)
+	require.Equal(t, label, instanceData.Label)
+	require.Equal(t, false, instanceData.IsFavorite)
 	require.Equal(t, false, instanceData.IsAccessTokenExpired)
 	require.Equal(t, "test-account-id", instanceData.Accounts[0].AccountId)
 	require.Equal(t, "test-account-name", instanceData.Accounts[0].AccountName)
@@ -394,8 +447,11 @@ func TestGetInstanceData(t *testing.T) {
 func TestGetInstance_AccessTokenExpired(t *testing.T) {
 	startUrl := "https://test-start-url.aws-apps.com/start"
 	region := "eu-west-1"
+	label := "test_label"
 
-	instanceId, controller, _, mockTimeProvider := simulateSuccessfulSetup(t, startUrl, region)
+	controller, mockAws, mockTimeProvider := initController(t)
+
+	instanceId := simulateSuccessfulSetup(t, controller, mockAws, mockTimeProvider, startUrl, region, label)
 
 	mockTimeProvider.On("NowUnix").Return(10)
 
@@ -406,7 +462,7 @@ func TestGetInstance_AccessTokenExpired(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, instanceId, data.InstanceId)
-	require.Equal(t, "test-label", data.Label)
+	require.Equal(t, label, data.Label)
 	require.Equal(t, true, data.IsAccessTokenExpired)
 	require.Empty(t, data.Accounts)
 }
@@ -426,11 +482,93 @@ func TestGetNonExistentInstance(t *testing.T) {
 	require.Error(t, err, ErrInstanceWasNotFound)
 }
 
+func TestMarkInstanceAsFavorite(t *testing.T) {
+	controller, mockAws, mockTimeProvider := initController(t)
+
+	startUrl := "https://test-start-url.aws-apps.com/start"
+	region := "eu-west-1"
+	label := "test_label"
+
+	instanceId := simulateSuccessfulSetup(t, controller, mockAws, mockTimeProvider, startUrl, region, label)
+
+	err := controller.MarkAsFavorite(instanceId)
+	require.NoError(t, err)
+
+	mockTimeProvider.On("NowUnix").Once().Return(4)
+	mockListAccountsRes := awssso.ListAccountsResponse{
+		Accounts: []awssso.AwsAccount{
+			{
+				AccountId:    "test-account-id",
+				AccountName:  "test-account-name",
+				AccountEmail: "test-account-email",
+			},
+			{
+				AccountId:    "test-account-id-2",
+				AccountName:  "test-account-name-2",
+				AccountEmail: "test-account-email-2",
+			},
+		},
+	}
+	mockAws.On("ListAccounts", mock.Anything, mock.AnythingOfType("string")).Return(&mockListAccountsRes, nil)
+
+	instanceData, err := controller.GetInstanceData(instanceId)
+	require.NoError(t, err)
+
+	require.Equal(t, true, instanceData.IsFavorite)
+}
+
+func TestUnmarkInstanceAsFavorite(t *testing.T) {
+	controller, mockAws, mockTimeProvider := initController(t)
+
+	startUrl := "https://test-start-url.aws-apps.com/start"
+	region := "eu-west-1"
+	label := "test_label"
+
+	instanceId := simulateSuccessfulSetup(t, controller, mockAws, mockTimeProvider, startUrl, region, label)
+
+	err := controller.MarkAsFavorite(instanceId)
+	require.NoError(t, err)
+
+	mockTimeProvider.On("NowUnix").Once().Return(4)
+	mockListAccountsRes := awssso.ListAccountsResponse{
+		Accounts: []awssso.AwsAccount{
+			{
+				AccountId:    "test-account-id",
+				AccountName:  "test-account-name",
+				AccountEmail: "test-account-email",
+			},
+			{
+				AccountId:    "test-account-id-2",
+				AccountName:  "test-account-name-2",
+				AccountEmail: "test-account-email-2",
+			},
+		},
+	}
+	mockAws.On("ListAccounts", mock.Anything, mock.AnythingOfType("string")).Return(&mockListAccountsRes, nil)
+
+	instanceData, err := controller.GetInstanceData(instanceId)
+	require.NoError(t, err)
+	require.Equal(t, true, instanceData.IsFavorite)
+
+	err = controller.UnmarkAsFavorite(instanceId)
+	require.NoError(t, err)
+
+	mockTimeProvider.On("NowUnix").Once().Return(5)
+
+	instanceData, err = controller.GetInstanceData(instanceId)
+	require.NoError(t, err)
+
+	require.Equal(t, false, instanceData.IsFavorite)
+}
+
 func TestRefreshAccessToken(t *testing.T) {
 	startUrl := "https://test-start-url.aws-apps.com/start"
 	region := "eu-west-1"
+	label := "test_label"
 
-	instanceId, controller, mockAws, mockTimeProvider := simulateSuccessfulSetup(t, startUrl, region)
+	controller, mockAws, mockTimeProvider := initController(t)
+
+	instanceId := simulateSuccessfulSetup(t, controller, mockAws, mockTimeProvider, startUrl, region, label)
 
 	mockAuthRes := awssso.AuthorizationResponse{
 		DeviceCode:              "test-device-code-2",
@@ -449,7 +587,7 @@ func TestRefreshAccessToken(t *testing.T) {
 		ClientId:        "test-client-id",
 		StartUrl:        "https://test-start-url.aws-apps.com/start",
 		Region:          "eu-west-1",
-		Label:           "test-label",
+		Label:           label,
 		VerificationUri: "https://test-verification-url-2",
 		UserCode:        "test-user-code-2",
 		DeviceCode:      "test-device-code-2",
@@ -460,8 +598,11 @@ func TestRefreshAccessToken(t *testing.T) {
 func TestFinalizeRefreshAccessToken(t *testing.T) {
 	startUrl := "https://test-start-url.aws-apps.com/start"
 	region := "eu-west-1"
+	label := "test_label"
 
-	instanceId, controller, mockAws, mockTimeProvider := simulateSuccessfulSetup(t, startUrl, region)
+	controller, mockAws, mockTimeProvider := initController(t)
+
+	instanceId := simulateSuccessfulSetup(t, controller, mockAws, mockTimeProvider, startUrl, region, label)
 
 	mockAuthRes := awssso.AuthorizationResponse{
 		DeviceCode:              "test-device-code-2",
@@ -493,8 +634,11 @@ func TestFinalizeRefreshAccessToken(t *testing.T) {
 func TestRefresh_NonExistentInstance(t *testing.T) {
 	startUrl := "https://test-start-url.aws-apps.com/start"
 	region := "eu-west-1"
+	label := "test_label"
 
-	_, controller, _, _ := simulateSuccessfulSetup(t, startUrl, region)
+	controller, mockAws, mockTimeProvider := initController(t)
+
+	_ = simulateSuccessfulSetup(t, controller, mockAws, mockTimeProvider, startUrl, region, label)
 
 	_, err := controller.RefreshAccessToken("well-if-u-can-find-me-it-sucks")
 	require.Error(t, err, ErrInstanceWasNotFound)
@@ -503,8 +647,11 @@ func TestRefresh_NonExistentInstance(t *testing.T) {
 func TestFinalizeRefreshAccessToken_InstanceDoesNotExist(t *testing.T) {
 	startUrl := "https://test-start-url.aws-apps.com/start"
 	region := "eu-west-1"
+	label := "test_label"
 
-	instanceId, controller, mockAws, mockTimeProvider := simulateSuccessfulSetup(t, startUrl, region)
+	controller, mockAws, mockTimeProvider := initController(t)
+
+	instanceId := simulateSuccessfulSetup(t, controller, mockAws, mockTimeProvider, startUrl, region, label)
 
 	mockAuthRes := awssso.AuthorizationResponse{
 		DeviceCode:              "test-device-code-2",
@@ -528,8 +675,11 @@ func TestFinalizeRefreshAccessToken_InstanceDoesNotExist(t *testing.T) {
 func TestFinalizeRefreshAccessToken_DeviceNotAuthorizedByUser(t *testing.T) {
 	startUrl := "https://test-start-url.aws-apps.com/start"
 	region := "eu-west-1"
+	label := "test_label"
 
-	instanceId, controller, mockAws, mockTimeProvider := simulateSuccessfulSetup(t, startUrl, region)
+	controller, mockAws, mockTimeProvider := initController(t)
+
+	instanceId := simulateSuccessfulSetup(t, controller, mockAws, mockTimeProvider, startUrl, region, label)
 
 	mockAuthRes := awssso.AuthorizationResponse{
 		DeviceCode:              "test-device-code-2",
@@ -552,8 +702,11 @@ func TestFinalizeRefreshAccessToken_DeviceNotAuthorizedByUser(t *testing.T) {
 func TestFinalizeRefreshAccessToken_DeviceAuthTimeout(t *testing.T) {
 	startUrl := "https://test-start-url.aws-apps.com/start"
 	region := "eu-west-1"
+	label := "test_label"
 
-	instanceId, controller, mockAws, mockTimeProvider := simulateSuccessfulSetup(t, startUrl, region)
+	controller, mockAws, mockTimeProvider := initController(t)
+
+	instanceId := simulateSuccessfulSetup(t, controller, mockAws, mockTimeProvider, startUrl, region, label)
 
 	mockAuthRes := awssso.AuthorizationResponse{
 		DeviceCode:              "test-device-code-2",

@@ -3,6 +3,7 @@ package favorites
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/rs/zerolog"
 )
@@ -14,6 +15,7 @@ type Favorite struct {
 
 type FavoritesRepo interface {
 	ListAll(ctx context.Context) ([]*Favorite, error)
+	IsFavorite(ctx context.Context, favorite *Favorite) (bool, error)
 	Add(ctx context.Context, favorite *Favorite) error
 	Remove(ctx context.Context, favorite *Favorite) error
 }
@@ -57,11 +59,27 @@ func (f *favoritesImpl) ListAll(ctx context.Context) ([]*Favorite, error) {
 	}
 
 	return favorites, nil
+}
 
+func (f *favoritesImpl) IsFavorite(ctx context.Context, favorite *Favorite) (bool, error) {
+	row := f.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM favorite_instances WHERE provider_code = ? AND instance_id = ? `, favorite.ProviderCode, favorite.InstanceId)
+
+	var count int
+	err := row.Scan(&count)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+
+		return false, err
+	}
+
+	return count > 0, nil
 }
 
 func (f *favoritesImpl) Add(ctx context.Context, favorite *Favorite) error {
-	_, err := f.db.ExecContext(ctx, `INSERT INTO favorite_instances (provider_code, instance_id) VALUES (?, ?) `, "aws-iam-idc", favorite.InstanceId, favorite.ProviderCode)
+	_, err := f.db.ExecContext(ctx, `INSERT INTO favorite_instances (provider_code, instance_id) VALUES (?, ?) `, favorite.ProviderCode, favorite.InstanceId)
 
 	if err != nil {
 		return err
@@ -71,7 +89,7 @@ func (f *favoritesImpl) Add(ctx context.Context, favorite *Favorite) error {
 }
 
 func (f *favoritesImpl) Remove(ctx context.Context, favorite *Favorite) error {
-	res, err := f.db.ExecContext(ctx, `DELETE FROM favorite_instances WHERE provider_code = ? AND instance_id = ? `, "aws-iam-idc", favorite.InstanceId, favorite.ProviderCode)
+	res, err := f.db.ExecContext(ctx, `DELETE FROM favorite_instances WHERE provider_code = ? AND instance_id = ? `, favorite.ProviderCode, favorite.InstanceId)
 
 	if err != nil {
 		return err
