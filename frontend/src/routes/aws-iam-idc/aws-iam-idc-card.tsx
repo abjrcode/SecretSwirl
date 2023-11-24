@@ -40,14 +40,20 @@ export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
   const cardDataResult = fetcher.data as AwsIamIdcCardDataResult | undefined
 
   if (cardDataResult === undefined) {
-    return <div>Loading...</div>
+    return (
+      <div className="flex flex-col gap-4 items-center w-96">
+        <div className="skeleton h-4 w-full"></div>
+        <div className="skeleton h-48 w-5/6"></div>
+        <div className="skeleton h-4 w-full"></div>
+      </div>
+    )
   }
 
   if (cardDataResult.success) {
     const cardData = cardDataResult.result
 
     return (
-      <div className="card gap-6 px-6 py-4 card-bordered border-secondary bg-base-200 drop-shadow-lg">
+      <div className="card gap-6 px-6 py-4 max-w-lg card-bordered border-secondary bg-base-200 drop-shadow-lg">
         <div
           role="heading"
           className="card-title justify-between">

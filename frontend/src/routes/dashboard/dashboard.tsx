@@ -1,4 +1,4 @@
-import { Link, useLoaderData } from "react-router-dom"
+import { useLoaderData } from "react-router-dom"
 import { AwsIamIdcCard } from "../aws-iam-idc/aws-iam-idc-card"
 import { main } from "../../../wailsjs/go/models"
 
@@ -26,11 +26,6 @@ export function Dashboard() {
           />
         )
       })}
-      <Link
-        className="btn btn-primary"
-        to="/providers">
-        New
-      </Link>
     </>
   )
 }

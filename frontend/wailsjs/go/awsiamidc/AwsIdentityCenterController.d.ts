@@ -12,6 +12,8 @@ export function GetInstanceData(arg1:string):Promise<awsiamidc.AwsIdentityCenter
 
 export function Init(arg1:context.Context,arg2:logging.ErrorHandler):Promise<void>;
 
+export function ListInstances():Promise<Array<awsiamidc.AwsIdentityCenterCardData>>;
+
 export function RefreshAccessToken(arg1:string):Promise<awsiamidc.AuthorizeDeviceFlowResult>;
 
 export function Setup(arg1:string,arg2:string,arg3:string):Promise<awsiamidc.AuthorizeDeviceFlowResult>;
