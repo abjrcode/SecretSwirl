@@ -8,7 +8,7 @@ export function FinalizeRefreshAccessToken(arg1:string,arg2:string,arg3:string,a
 
 export function FinalizeSetup(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string):Promise<string>;
 
-export function GetInstanceData(arg1:string):Promise<awsiamidc.AwsIdentityCenterCardData>;
+export function GetInstanceData(arg1:string,arg2:boolean):Promise<awsiamidc.AwsIdentityCenterCardData>;
 
 export function Init(arg1:context.Context,arg2:logging.ErrorHandler):Promise<void>;
 

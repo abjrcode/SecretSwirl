@@ -38,9 +38,18 @@ export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
     if (fetcher.state === "idle" && !fetcher.data) {
       const urlSearchParams = new URLSearchParams()
       urlSearchParams.append("instanceId", instanceId)
+      urlSearchParams.append("refresh", "false")
       fetcher.load(`/internal/api/aws-iam-idc-card?${urlSearchParams.toString()}`)
     }
   }, [instanceId, fetcher])
+
+  function forceRefresh() {
+    const urlSearchParams = new URLSearchParams()
+    urlSearchParams.append("instanceId", instanceId)
+    urlSearchParams.append("refresh", "true")
+
+    fetcher.load(`/internal/api/aws-iam-idc-card?${urlSearchParams.toString()}`)
+  }
 
   async function markAsFavorite() {
     await MarkAsFavorite(instanceId)
@@ -71,23 +80,43 @@ export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
       <div className="card gap-6 px-6 py-4 max-w-lg card-bordered border-secondary bg-base-200 drop-shadow-lg">
         <div
           role="heading"
-          className="card-title">
-          <button onClick={cardData.isFavorite ? unmarkAsFavorite : markAsFavorite}>
+          className="card-title justify-between">
+          <div className="inline-flex items-center justify-center gap-2">
+            <button
+              onClick={cardData.isFavorite ? unmarkAsFavorite : markAsFavorite}>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill={cardData.isFavorite ? "currentColor" : "none"}
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="w-6 h-6">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"
+                />
+              </svg>
+            </button>
+            <h1 className="text-2xl font-semibold">{cardData.label}</h1>
+          </div>
+          <button
+            className={fetcher.state !== "idle" ? "animate-spin" : ""}
+            onClick={forceRefresh}>
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              fill={cardData.isFavorite ? "currentColor" : "none"}
+              fill="none"
               viewBox="0 0 24 24"
               strokeWidth={1.5}
               stroke="currentColor"
-              className="inline-flex w-6 h-6">
+              className="w-6 h-6">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"
+                d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"
               />
             </svg>
           </button>
-          <h1 className="text-2xl font-semibold">{cardData.label}</h1>
         </div>
         <div className="card-body">
           {!cardData.isAccessTokenExpired && (
@@ -100,28 +129,22 @@ export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
                       {account.accountName} ({account.accountId})
                     </h3>
                     <ul className="list-inside space-y-2 list-disc pl-4">
-                      <li>
-                        <span>Admin</span>
-                        <div className="inline-flex gap-2">
-                          <button className="btn btn-secondary btn-outline btn-xs">
-                            copy credentials
-                          </button>
-                          <a className="link link-secondary"> Management console </a>
-                        </div>
-                      </li>
-                      <li>
-                        <span>Viewer</span>
-                        <div className="inline-flex gap-2">
-                          <button className="btn btn-secondary btn-outline btn-xs">
-                            copy credentials
-                          </button>
-                          <a className="link link-secondary"> Management console </a>
-                        </div>
-                      </li>
+                      {account.roles.map((role) => (
+                        <li
+                          key={role.roleName}
+                          className="inline-flex items-center gap-2">
+                          <span>{role.roleName}</span>
+                          <div className="inline-flex gap-2">
+                            <button className="btn btn-accent btn-xs">
+                              copy credentials
+                            </button>
+                          </div>
+                        </li>
+                      ))}
                     </ul>
                   </li>
                 ))}
-              </ul>{" "}
+              </ul>
             </>
           )}
 
