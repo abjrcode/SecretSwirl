@@ -8,25 +8,20 @@ export function Providers() {
   return (
     <>
       {outlet == null ? (
-        <>
+        <div className="flex flex-col gap-10">
           <h1 className="text-primary text-6xl">Supported Providers</h1>
-          <ul>
+          <ul className="flex gap-4">
             {providers.map((provider) => (
               <li key={provider.code}>
                 <Link
                   className="btn btn-primary"
-                  to={`${provider.code}/setup`}>
+                  to={`${provider.code}`}>
                   {provider.name}
                 </Link>
               </li>
             ))}
           </ul>
-          <Link
-            to="/"
-            className="link link-secondary">
-            &#8592; dashboard
-          </Link>
-        </>
+        </div>
       ) : null}
       <Outlet />
     </>

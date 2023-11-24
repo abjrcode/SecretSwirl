@@ -57,50 +57,52 @@ export function AwsIamIdcSetup() {
   }, [navigate, setupResult, wails, toaster])
 
   return (
-    <Form
-      method="post"
-      className="flex flex-col gap-4 border-2 p-6">
-      <h1 className="text-primary text-4xl">AWS IAM Identity Center</h1>
-      <label className="label">
-        <span className="label-text">Start URL</span>
-      </label>
-      <input
-        name="startUrl"
-        type="url"
-        className="input input-bordered input-primary w-96"
-        defaultValue={startUrl}
-      />
-      <label className="label">
-        <span className="label-text">AWS Region</span>
-      </label>
-      <select
-        name="awsRegion"
-        className="select select-primary"
-        defaultValue={awsRegion}>
-        <option value={awsRegion}>{awsRegion}</option>
-      </select>
-      <label className="label">
-        <span className="label-text">Label</span>
-      </label>
-      <input
-        name="label"
-        type="text"
-        minLength={1}
-        maxLength={50}
-        className="input input-bordered input-primary w-96"
-        placeholder="Personal AWS Account"
-      />
-      <button
-        type="submit"
-        className="btn btn-primary">
-        Configure
-      </button>
-      <button
-        type="reset"
-        onClick={() => navigate(-1)}
-        className="btn btn-secondary">
-        Cancel
-      </button>
-    </Form>
+    <div className="h-screen flex flex-col items-center justify-center">
+      <Form
+        method="post"
+        className="flex flex-col gap-4 border-2 p-6">
+        <h1 className="text-primary text-4xl">AWS IAM Identity Center</h1>
+        <label className="label">
+          <span className="label-text">Start URL</span>
+        </label>
+        <input
+          name="startUrl"
+          type="url"
+          className="input input-bordered input-primary w-96"
+          defaultValue={startUrl}
+        />
+        <label className="label">
+          <span className="label-text">AWS Region</span>
+        </label>
+        <select
+          name="awsRegion"
+          className="select select-primary"
+          defaultValue={awsRegion}>
+          <option value={awsRegion}>{awsRegion}</option>
+        </select>
+        <label className="label">
+          <span className="label-text">Label</span>
+        </label>
+        <input
+          name="label"
+          type="text"
+          minLength={1}
+          maxLength={50}
+          className="input input-bordered input-primary w-96"
+          placeholder="Personal AWS Account"
+        />
+        <button
+          type="submit"
+          className="btn btn-primary">
+          Configure
+        </button>
+        <button
+          type="reset"
+          onClick={() => navigate(-1)}
+          className="btn btn-secondary">
+          Cancel
+        </button>
+      </Form>
+    </div>
   )
 }

@@ -46,8 +46,8 @@ export function Toast({
   }`
 
   const toastAnimationClass = `${
-    isEntering.current ? "animate-[slideInLeft_0.5s_ease-in_both]" : ""
-  } ${isExiting ? "animate-[slideOutLeft_0.3s_ease-out_both]" : ""}`
+    isEntering.current ? "animate-[slideInRight_0.5s_ease-in_both]" : ""
+  } ${isExiting ? "animate-[slideOutRight_0.3s_ease-out_both]" : ""}`
 
   const exitAnimationTimer = useRef<number | null>(null)
   const toastRemovalTimer = useRef<number | null>(null)

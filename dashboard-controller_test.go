@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/abjrcode/swervo/favorites"
 	"github.com/abjrcode/swervo/internal/migrations"
 	"github.com/abjrcode/swervo/internal/testhelpers"
 	"github.com/rs/zerolog"
@@ -12,10 +13,13 @@ import (
 
 func initDashboardController(t *testing.T) *DashboardController {
 	db, err := migrations.NewInMemoryMigratedDatabase(t, "dashboard-controller-tests.db")
-
 	require.NoError(t, err)
+
+	logger := zerolog.Nop()
+	favoritesRepo := favorites.NewFavorites(db, &logger)
+
 	controller := &DashboardController{
-		db: db,
+		favoritesRepo: favoritesRepo,
 	}
 	ctx := zerolog.Nop().WithContext(context.Background())
 	errHandler := testhelpers.NewMockErrorHandler(t)
