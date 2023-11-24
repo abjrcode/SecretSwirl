@@ -42,6 +42,12 @@ func (m *mockAwsSsoOidcClient) ListAccounts(ctx context.Context, accessToken str
 	return res, args.Error(1)
 }
 
+func (m *mockAwsSsoOidcClient) GetRoleCredentials(ctx context.Context, accountId, roleName, accessToken string) (*awssso.GetRoleCredentialsResponse, error) {
+	args := m.Called(ctx, accountId, roleName, accessToken)
+	res, _ := args.Get(0).(*awssso.GetRoleCredentialsResponse)
+	return res, args.Error(1)
+}
+
 func initController(t *testing.T) (*AwsIdentityCenterController, *mockAwsSsoOidcClient, *testhelpers.MockClock) {
 	db, err := migrations.NewInMemoryMigratedDatabase(t, "aws-iam-idc-controller-tests.db")
 	require.NoError(t, err)
@@ -448,6 +454,57 @@ func TestGetInstanceData(t *testing.T) {
 
 	require.Equal(t, "test-account-id-2", instanceData.Accounts[1].AccountId)
 	require.Equal(t, "test-account-name-2", instanceData.Accounts[1].AccountName)
+}
+
+func TestGetRoleCredentials(t *testing.T) {
+	startUrl := "https://test-start-url.aws-apps.com/start"
+	region := "eu-west-1"
+	label := "test_label"
+
+	roleName := "test-role-name"
+	accountId := "test-account-id"
+
+	controller, mockAws, mockTimeProvider := initController(t)
+
+	instanceId := simulateSuccessfulSetup(t, controller, mockAws, mockTimeProvider, startUrl, region, label)
+
+	mockTimeProvider.On("NowUnix").Return(3)
+
+	mockListAccountsRes := awssso.ListAccountsResponse{
+		Accounts: []awssso.AwsAccount{
+			{
+				AccountId:    accountId,
+				AccountName:  "test-account-name",
+				AccountEmail: "test-account-email",
+				Roles: []awssso.AwsAccountRole{
+					{
+						RoleName: roleName,
+					},
+				},
+			},
+		},
+	}
+
+	mockAws.On("ListAccounts", mock.Anything, mock.AnythingOfType("string")).Return(&mockListAccountsRes, nil)
+
+	mockGetRoleCredentialsRes := awssso.GetRoleCredentialsResponse{
+		AccessKeyId:     "test-access-key-id",
+		SecretAccessKey: "test-secret-key",
+		SessionToken:    "test-session-token",
+		Expiration:      100,
+	}
+
+	mockAws.On("GetRoleCredentials", mock.Anything, accountId, roleName, mock.AnythingOfType("string")).Return(&mockGetRoleCredentialsRes, nil)
+
+	roleCredentials, err := controller.GetRoleCredentials(instanceId, accountId, roleName)
+
+	require.NoError(t, err)
+	require.Equal(t, roleCredentials, &AwsIdentityCenterAccountRoleCredentials{
+		AccessKeyId:     mockGetRoleCredentialsRes.AccessKeyId,
+		SecretAccessKey: mockGetRoleCredentialsRes.SecretAccessKey,
+		SessionToken:    mockGetRoleCredentialsRes.SessionToken,
+		Expiration:      mockGetRoleCredentialsRes.Expiration,
+	})
 }
 
 func TestGetInstance_AccessTokenExpired(t *testing.T) {
