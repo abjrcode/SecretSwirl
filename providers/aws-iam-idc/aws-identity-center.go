@@ -66,9 +66,14 @@ func (controller *AwsIdentityCenterController) Init(ctx context.Context, errorHa
 	controller.errHandler = errorHandler
 }
 
+type AwsIdentityCenterAccountRole struct {
+	RoleName string `json:"roleName"`
+}
+
 type AwsIdentityCenterAccount struct {
-	AccountId   string `json:"accountId"`
-	AccountName string `json:"accountName"`
+	AccountId   string                         `json:"accountId"`
+	AccountName string                         `json:"accountName"`
+	Roles       []AwsIdentityCenterAccountRole `json:"roles"`
 }
 
 type AwsIdentityCenterCardData struct {
@@ -204,9 +209,18 @@ func (c *AwsIdentityCenterController) GetInstanceData(instanceId string, forceRe
 	accounts := make([]AwsIdentityCenterAccount, 0)
 
 	for _, account := range accountsOut.Accounts {
+		accountRoles := make([]AwsIdentityCenterAccountRole, 0)
+
+		for _, role := range account.Roles {
+			accountRoles = append(accountRoles, AwsIdentityCenterAccountRole{
+				RoleName: role.RoleName,
+			})
+		}
+
 		accounts = append(accounts, AwsIdentityCenterAccount{
 			AccountId:   account.AccountId,
 			AccountName: account.AccountName,
+			Roles:       accountRoles,
 		})
 	}
 

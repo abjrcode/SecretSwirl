@@ -420,6 +420,11 @@ func TestGetInstanceData(t *testing.T) {
 				AccountId:    "test-account-id",
 				AccountName:  "test-account-name",
 				AccountEmail: "test-account-email",
+				Roles: []awssso.AwsAccountRole{
+					{
+						RoleName: "test-role-name",
+					},
+				},
 			},
 			{
 				AccountId:    "test-account-id-2",
@@ -439,6 +444,7 @@ func TestGetInstanceData(t *testing.T) {
 	require.Equal(t, false, instanceData.IsAccessTokenExpired)
 	require.Equal(t, "test-account-id", instanceData.Accounts[0].AccountId)
 	require.Equal(t, "test-account-name", instanceData.Accounts[0].AccountName)
+	require.Equal(t, "test-role-name", instanceData.Accounts[0].Roles[0].RoleName)
 
 	require.Equal(t, "test-account-id-2", instanceData.Accounts[1].AccountId)
 	require.Equal(t, "test-account-name-2", instanceData.Accounts[1].AccountName)
