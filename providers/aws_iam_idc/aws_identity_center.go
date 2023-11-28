@@ -12,7 +12,7 @@ import (
 
 	"github.com/abjrcode/swervo/clients/awssso"
 	"github.com/abjrcode/swervo/favorites"
-	"github.com/abjrcode/swervo/internal/logging"
+	"github.com/abjrcode/swervo/internal/faults"
 	"github.com/abjrcode/swervo/internal/security/encryption"
 	"github.com/abjrcode/swervo/internal/utils"
 	"github.com/abjrcode/swervo/providers"
@@ -34,9 +34,7 @@ var (
 )
 
 type AwsIdentityCenterController struct {
-	ctx               context.Context
-	logger            *zerolog.Logger
-	errHandler        logging.ErrorHandler
+	logger            zerolog.Logger
 	db                *sql.DB
 	favoritesRepo     favorites.FavoritesRepo
 	encryptionService encryption.EncryptionService
@@ -45,11 +43,14 @@ type AwsIdentityCenterController struct {
 	cache             *freecache.Cache
 }
 
-func NewAwsIdentityCenterController(db *sql.DB, favoritesRepo favorites.FavoritesRepo, encryptionService encryption.EncryptionService, awsSsoClient awssso.AwsSsoOidcClient, datetime utils.Clock) *AwsIdentityCenterController {
+func NewAwsIdentityCenterController(db *sql.DB, favoritesRepo favorites.FavoritesRepo, encryptionService encryption.EncryptionService, awsSsoClient awssso.AwsSsoOidcClient, datetime utils.Clock, logger zerolog.Logger) *AwsIdentityCenterController {
 	fiveHundredTwelveKilobytes := 512 * 1024
 	cache := freecache.NewCache(fiveHundredTwelveKilobytes)
 
+	logger = logger.With().Str("component", "aws_idc_controller").Logger()
+
 	return &AwsIdentityCenterController{
+		logger:            logger,
 		db:                db,
 		favoritesRepo:     favoritesRepo,
 		encryptionService: encryptionService,
@@ -57,13 +58,6 @@ func NewAwsIdentityCenterController(db *sql.DB, favoritesRepo favorites.Favorite
 		timeHelper:        datetime,
 		cache:             cache,
 	}
-}
-
-func (controller *AwsIdentityCenterController) Init(ctx context.Context, errorHandler logging.ErrorHandler) {
-	controller.ctx = ctx
-	enrichedLogger := zerolog.Ctx(ctx).With().Str("component", "aws_idc_controller").Logger()
-	controller.logger = &enrichedLogger
-	controller.errHandler = errorHandler
 }
 
 type AwsIdentityCenterAccountRole struct {
@@ -93,15 +87,15 @@ type AwsIdentityCenterCardData struct {
 	Accounts             []AwsIdentityCenterAccount `json:"accounts"`
 }
 
-func (c *AwsIdentityCenterController) ListInstances() ([]string, error) {
-	rows, err := c.db.QueryContext(c.ctx, "SELECT instance_id FROM aws_iam_idc_instances ORDER BY instance_id DESC")
+func (c *AwsIdentityCenterController) ListInstances(ctx context.Context) ([]string, error) {
+	rows, err := c.db.QueryContext(ctx, "SELECT instance_id FROM aws_iam_idc_instances ORDER BY instance_id DESC")
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return make([]string, 0), nil
 		}
 
-		c.errHandler.Catch(c.logger, err)
+		return nil, errors.Join(err, faults.ErrFatal)
 	}
 
 	instances := make([]string, 0)
@@ -110,7 +104,7 @@ func (c *AwsIdentityCenterController) ListInstances() ([]string, error) {
 		var instanceId string
 
 		if err := rows.Scan(&instanceId); err != nil {
-			c.errHandler.Catch(c.logger, err)
+			return nil, errors.Join(err, faults.ErrFatal)
 		}
 
 		instances = append(instances, instanceId)
@@ -119,8 +113,8 @@ func (c *AwsIdentityCenterController) ListInstances() ([]string, error) {
 	return instances, nil
 }
 
-func (c *AwsIdentityCenterController) GetInstanceData(instanceId string, forceRefresh bool) (*AwsIdentityCenterCardData, error) {
-	row := c.db.QueryRowContext(c.ctx, "SELECT region, label, access_token_enc, access_token_created_at, access_token_expires_in, enc_key_id FROM aws_iam_idc_instances WHERE instance_id = ?", instanceId)
+func (c *AwsIdentityCenterController) GetInstanceData(ctx context.Context, instanceId string, forceRefresh bool) (*AwsIdentityCenterCardData, error) {
+	row := c.db.QueryRowContext(ctx, "SELECT region, label, access_token_enc, access_token_created_at, access_token_expires_in, enc_key_id FROM aws_iam_idc_instances WHERE instance_id = ?", instanceId)
 
 	var region string
 	var label string
@@ -134,15 +128,17 @@ func (c *AwsIdentityCenterController) GetInstanceData(instanceId string, forceRe
 			return nil, ErrInstanceWasNotFound
 		}
 
-		c.errHandler.Catch(c.logger, err)
+		return nil, errors.Join(err, faults.ErrFatal)
 	}
 
-	isFavorite, err := c.favoritesRepo.IsFavorite(c.ctx, &favorites.Favorite{
+	isFavorite, err := c.favoritesRepo.IsFavorite(ctx, &favorites.Favorite{
 		ProviderCode: providers.AwsIamIdc,
 		InstanceId:   instanceId,
 	})
 
-	c.errHandler.CatchWithMsg(c.logger, err, "failed to check if instance is favorite")
+	if err != nil {
+		return nil, errors.Join(err, faults.ErrFatal)
+	}
 
 	now := c.timeHelper.NowUnix()
 	if now > accessTokenCreatedAt+accessTokenExpiresIn {
@@ -172,7 +168,7 @@ func (c *AwsIdentityCenterController) GetInstanceData(instanceId string, forceRe
 
 			if err != nil {
 				c.logger.Error().Err(err).Msg("failed to decode accounts from cache")
-				c.errHandler.Catch(c.logger, err)
+				return nil, errors.Join(err, faults.ErrFatal)
 			}
 
 			return &AwsIdentityCenterCardData{
@@ -189,11 +185,13 @@ func (c *AwsIdentityCenterController) GetInstanceData(instanceId string, forceRe
 
 	accessToken, err := c.encryptionService.Decrypt(accessTokenEnc, encKeyId)
 
-	c.errHandler.CatchWithMsg(c.logger, err, "failed to decrypt access token")
+	if err != nil {
+		return nil, errors.Join(err, faults.ErrFatal)
+	}
 
 	c.logger.Debug().Msgf("fetching accounts for instance [%s] with refresh=%t", instanceId, forceRefresh)
-	ctx := context.WithValue(c.ctx, awssso.AwsRegion("awsRegion"), region)
-	accountsOut, err := c.awsSsoClient.ListAccounts(ctx, accessToken)
+	awsContext := context.WithValue(ctx, awssso.AwsRegion("awsRegion"), region)
+	accountsOut, err := c.awsSsoClient.ListAccounts(awsContext, accessToken)
 
 	if err != nil {
 		c.logger.Error().Err(err).Msg("aws sso client failed to list accounts")
@@ -207,7 +205,7 @@ func (c *AwsIdentityCenterController) GetInstanceData(instanceId string, forceRe
 
 	if err != nil {
 		c.logger.Error().Err(err).Msg("failed to encode accounts to cache")
-		c.errHandler.Catch(c.logger, err)
+		return nil, errors.Join(err, faults.ErrFatal)
 	}
 
 	cacheTtl := accessTokenCreatedAt + accessTokenExpiresIn - now
@@ -242,8 +240,14 @@ func (c *AwsIdentityCenterController) GetInstanceData(instanceId string, forceRe
 	}, nil
 }
 
-func (c *AwsIdentityCenterController) GetRoleCredentials(instanceId, accountId, roleName string) (*AwsIdentityCenterAccountRoleCredentials, error) {
-	row := c.db.QueryRowContext(c.ctx, "SELECT region, access_token_enc, access_token_created_at, access_token_expires_in, enc_key_id FROM aws_iam_idc_instances WHERE instance_id = ?", instanceId)
+type AwsIamIdc_GetRoleCredentialsCommandInput struct {
+	InstanceId string `json:"instanceId"`
+	AccountId  string `json:"accountId"`
+	RoleName   string `json:"roleName"`
+}
+
+func (c *AwsIdentityCenterController) GetRoleCredentials(ctx context.Context, input AwsIamIdc_GetRoleCredentialsCommandInput) (*AwsIdentityCenterAccountRoleCredentials, error) {
+	row := c.db.QueryRowContext(ctx, "SELECT region, access_token_enc, access_token_created_at, access_token_expires_in, enc_key_id FROM aws_iam_idc_instances WHERE instance_id = ?", input.InstanceId)
 
 	var region string
 	var accessTokenEnc string
@@ -256,19 +260,21 @@ func (c *AwsIdentityCenterController) GetRoleCredentials(instanceId, accountId, 
 			return nil, ErrInstanceWasNotFound
 		}
 
-		c.errHandler.Catch(c.logger, err)
+		return nil, errors.Join(err, faults.ErrFatal)
 	}
 
 	accessToken, err := c.encryptionService.Decrypt(accessTokenEnc, encKeyId)
 
-	c.errHandler.CatchWithMsg(c.logger, err, "failed to decrypt access token")
+	if err != nil {
+		return nil, errors.Join(errors.New("failed to decrypt access token"), err, faults.ErrFatal)
+	}
 
-	ctx := context.WithValue(c.ctx, awssso.AwsRegion("awsRegion"), region)
-	res, err := c.awsSsoClient.GetRoleCredentials(ctx, accountId, roleName, accessToken)
+	awsContext := context.WithValue(ctx, awssso.AwsRegion("awsRegion"), region)
+	res, err := c.awsSsoClient.GetRoleCredentials(awsContext, input.AccountId, input.RoleName, accessToken)
 
 	if err != nil {
 		c.logger.Error().Err(err).Msg("failed to get role credentials")
-		c.errHandler.Catch(c.logger, err)
+		return nil, errors.Join(err, faults.ErrFatal)
 	}
 
 	return &AwsIdentityCenterAccountRoleCredentials{
@@ -317,26 +323,34 @@ type AuthorizeDeviceFlowResult struct {
 	DeviceCode      string `json:"deviceCode"`
 }
 
-func (c *AwsIdentityCenterController) Setup(startUrl, awsRegion, label string) (*AuthorizeDeviceFlowResult, error) {
-	if err := c.validateStartUrl(startUrl); err != nil {
+type AwsIamIdc_SetupCommandInput struct {
+	StartUrl  string `json:"startUrl"`
+	AwsRegion string `json:"awsRegion"`
+	Label     string `json:"label"`
+}
+
+func (c *AwsIdentityCenterController) Setup(ctx context.Context, input AwsIamIdc_SetupCommandInput) (*AuthorizeDeviceFlowResult, error) {
+	if err := c.validateStartUrl(input.StartUrl); err != nil {
 		return nil, err
 	}
 
-	if err := c.validateAwsRegion(awsRegion); err != nil {
+	if err := c.validateAwsRegion(input.AwsRegion); err != nil {
 		return nil, err
 	}
 
-	if err := c.validateLabel(label); err != nil {
+	if err := c.validateLabel(input.Label); err != nil {
 		return nil, err
 	}
 
-	ctx := context.WithValue(c.ctx, awssso.AwsRegion("awsRegion"), awsRegion)
+	startUrl := input.StartUrl
+	awsRegion := input.AwsRegion
+	label := input.Label
 
 	var exists bool
 	err := c.db.QueryRowContext(ctx, "SELECT 1 FROM aws_iam_idc_instances WHERE start_url = ?", startUrl).Scan(&exists)
 
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		c.errHandler.CatchWithMsg(c.logger, err, "failed to check if instance exists")
+		return nil, errors.Join(err, faults.ErrFatal)
 	}
 
 	if exists {
@@ -349,14 +363,14 @@ func (c *AwsIdentityCenterController) Setup(startUrl, awsRegion, label string) (
 		return nil, ErrInvalidLabel
 	}
 
-	regRes, err := c.getOrRegisterClient(ctx)
+	regRes, err := c.getOrRegisterClient(ctx, awsRegion)
 
 	if err != nil {
 		c.logger.Error().Err(err).Msg("failed to get or register client")
 		return nil, ErrTransientAwsClientError
 	}
 
-	authorizeRes, err := c.authorizeDevice(ctx, startUrl, regRes.ClientId, regRes.ClientSecret)
+	authorizeRes, err := c.authorizeDevice(ctx, startUrl, awsRegion, regRes.ClientId, regRes.ClientSecret)
 
 	if err != nil {
 		if errors.Is(err, awssso.ErrInvalidRequest) {
@@ -380,34 +394,44 @@ func (c *AwsIdentityCenterController) Setup(startUrl, awsRegion, label string) (
 	}, nil
 }
 
-func (c *AwsIdentityCenterController) FinalizeSetup(clientId, startUrl, region, label, userCode, deviceCode string) (string, error) {
-	if err := c.validateLabel(label); err != nil {
+type AwsIamIdc_FinalizeSetupCommandInput struct {
+	ClientId   string `json:"clientId"`
+	StartUrl   string `json:"startUrl"`
+	AwsRegion  string `json:"awsRegion"`
+	Label      string `json:"label"`
+	UserCode   string `json:"userCode"`
+	DeviceCode string `json:"deviceCode"`
+}
+
+func (c *AwsIdentityCenterController) FinalizeSetup(ctx context.Context, input AwsIamIdc_FinalizeSetupCommandInput) (string, error) {
+	if err := c.validateLabel(input.Label); err != nil {
 		return "", err
 	}
 
-	if err := c.validateStartUrl(startUrl); err != nil {
+	if err := c.validateStartUrl(input.StartUrl); err != nil {
 		return "", err
 	}
 
-	if err := c.validateAwsRegion(region); err != nil {
+	if err := c.validateAwsRegion(input.AwsRegion); err != nil {
 		return "", err
 	}
 
-	row := c.db.QueryRowContext(c.ctx, "SELECT client_secret_enc, enc_key_id FROM aws_iam_idc_clients")
+	row := c.db.QueryRowContext(ctx, "SELECT client_secret_enc, enc_key_id FROM aws_iam_idc_clients")
 
 	var clientSecretEnc string
 	var encKeyId string
 
 	if err := row.Scan(&clientSecretEnc, &encKeyId); err != nil {
-		c.errHandler.Catch(c.logger, err)
+		return "", errors.Join(err, faults.ErrFatal)
 	}
 
 	clientSecret, err := c.encryptionService.Decrypt(clientSecretEnc, encKeyId)
 
-	c.errHandler.CatchWithMsg(c.logger, err, "failed to decrypt client secret")
+	if err != nil {
+		return "", errors.Join(err, faults.ErrFatal)
+	}
 
-	ctx := context.WithValue(c.ctx, awssso.AwsRegion("awsRegion"), region)
-	tokenRes, err := c.getToken(ctx, clientId, clientSecret, deviceCode, userCode)
+	tokenRes, err := c.getToken(ctx, input.AwsRegion, input.ClientId, clientSecret, input.DeviceCode, input.UserCode)
 
 	if err != nil {
 		if errors.Is(err, awssso.ErrDeviceFlowNotAuthorized) {
@@ -426,19 +450,27 @@ func (c *AwsIdentityCenterController) FinalizeSetup(clientId, startUrl, region, 
 
 	idTokenEnc, keyId, err := c.encryptionService.Encrypt(tokenRes.IdToken)
 
-	c.errHandler.CatchWithMsg(c.logger, err, "failed to encrypt id token")
+	if err != nil {
+		return "", errors.Join(err, faults.ErrFatal)
+	}
 
 	accessTokenEnc, _, err := c.encryptionService.Encrypt(tokenRes.AccessToken)
 
-	c.errHandler.CatchWithMsg(c.logger, err, "failed to encrypt access token")
+	if err != nil {
+		return "", errors.Join(err, faults.ErrFatal)
+	}
 
 	refreshTokenEnc, _, err := c.encryptionService.Encrypt(tokenRes.RefreshToken)
-	c.errHandler.CatchWithMsg(c.logger, err, "failed to encrypt refresh token")
+	if err != nil {
+		return "", errors.Join(err, faults.ErrFatal)
+	}
 
 	nowUnix := c.timeHelper.NowUnix()
 
 	uniqueId, err := ksuid.NewRandomWithTime(time.Unix(nowUnix, 0))
-	c.errHandler.CatchWithMsg(c.logger, err, "failed to generate instance ID")
+	if err != nil {
+		return "", errors.Join(err, faults.ErrFatal)
+	}
 	instanceId := uniqueId.String()
 
 	sql := `INSERT INTO aws_iam_idc_instances
@@ -447,9 +479,9 @@ func (c *AwsIdentityCenterController) FinalizeSetup(clientId, startUrl, region, 
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	_, err = c.db.ExecContext(ctx, sql,
 		instanceId,
-		startUrl,
-		region,
-		label,
+		input.StartUrl,
+		input.AwsRegion,
+		input.Label,
 		true,
 		idTokenEnc,
 		accessTokenEnc,
@@ -459,30 +491,32 @@ func (c *AwsIdentityCenterController) FinalizeSetup(clientId, startUrl, region, 
 		refreshTokenEnc,
 		keyId)
 
-	c.errHandler.CatchWithMsg(c.logger, err, "failed to save token to database")
+	if err != nil {
+		return "", errors.Join(err, faults.ErrFatal)
+	}
 
 	return instanceId, nil
 }
 
-func (c *AwsIdentityCenterController) MarkAsFavorite(instanceId string) error {
-	return c.favoritesRepo.Add(c.ctx, &favorites.Favorite{
+func (c *AwsIdentityCenterController) MarkAsFavorite(ctx context.Context, instanceId string) error {
+	return c.favoritesRepo.Add(ctx, &favorites.Favorite{
 		ProviderCode: providers.AwsIamIdc,
 		InstanceId:   instanceId,
 	})
 }
 
-func (c *AwsIdentityCenterController) UnmarkAsFavorite(instanceId string) error {
-	return c.favoritesRepo.Remove(c.ctx, &favorites.Favorite{
+func (c *AwsIdentityCenterController) UnmarkAsFavorite(ctx context.Context, instanceId string) error {
+	return c.favoritesRepo.Remove(ctx, &favorites.Favorite{
 		ProviderCode: providers.AwsIamIdc,
 		InstanceId:   instanceId,
 	})
 }
 
-func (c *AwsIdentityCenterController) RefreshAccessToken(instanceId string) (*AuthorizeDeviceFlowResult, error) {
+func (c *AwsIdentityCenterController) RefreshAccessToken(ctx context.Context, instanceId string) (*AuthorizeDeviceFlowResult, error) {
 	var startUrl string
 	var awsRegion string
 	var label string
-	row := c.db.QueryRowContext(c.ctx, "SELECT start_url, region, label FROM aws_iam_idc_instances WHERE instance_id = ?", instanceId)
+	row := c.db.QueryRowContext(ctx, "SELECT start_url, region, label FROM aws_iam_idc_instances WHERE instance_id = ?", instanceId)
 
 	if err := row.Scan(&startUrl, &awsRegion, &label); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -491,15 +525,14 @@ func (c *AwsIdentityCenterController) RefreshAccessToken(instanceId string) (*Au
 		}
 	}
 
-	ctx := context.WithValue(c.ctx, awssso.AwsRegion("awsRegion"), awsRegion)
-	regRes, err := c.getOrRegisterClient(ctx)
+	regRes, err := c.getOrRegisterClient(ctx, awsRegion)
 
 	if err != nil {
 		c.logger.Error().Err(err).Msg("failed to get or register client")
 		return nil, ErrTransientAwsClientError
 	}
 
-	authorizeRes, err := c.authorizeDevice(ctx, startUrl, regRes.ClientId, regRes.ClientSecret)
+	authorizeRes, err := c.authorizeDevice(ctx, startUrl, awsRegion, regRes.ClientId, regRes.ClientSecret)
 
 	if err != nil {
 		c.logger.Error().Err(err).Msg("failed to authorize device")
@@ -519,27 +552,35 @@ func (c *AwsIdentityCenterController) RefreshAccessToken(instanceId string) (*Au
 	}, nil
 }
 
-func (c *AwsIdentityCenterController) FinalizeRefreshAccessToken(instanceId, region, userCode, deviceCode string) error {
-	if err := c.validateAwsRegion(region); err != nil {
+type AwsIamIdc_FinalizeRefreshAccessTokenCommandInput struct {
+	InstanceId string `json:"instanceId"`
+	Region     string `json:"region"`
+	UserCode   string `json:"userCode"`
+	DeviceCode string `json:"deviceCode"`
+}
+
+func (c *AwsIdentityCenterController) FinalizeRefreshAccessToken(ctx context.Context, input AwsIamIdc_FinalizeRefreshAccessTokenCommandInput) error {
+	if err := c.validateAwsRegion(input.Region); err != nil {
 		return err
 	}
 
-	row := c.db.QueryRowContext(c.ctx, "SELECT client_id, client_secret_enc, enc_key_id FROM aws_iam_idc_clients")
+	row := c.db.QueryRowContext(ctx, "SELECT client_id, client_secret_enc, enc_key_id FROM aws_iam_idc_clients")
 
 	var clientId string
 	var clientSecretEnc string
 	var encKeyId string
 
 	if err := row.Scan(&clientId, &clientSecretEnc, &encKeyId); err != nil {
-		c.errHandler.Catch(c.logger, err)
+		return errors.Join(err, faults.ErrFatal)
 	}
 
 	clientSecret, err := c.encryptionService.Decrypt(clientSecretEnc, encKeyId)
 
-	c.errHandler.CatchWithMsg(c.logger, err, "failed to decrypt client secret")
+	if err != nil {
+		return errors.Join(err, faults.ErrFatal)
+	}
 
-	ctx := context.WithValue(c.ctx, awssso.AwsRegion("awsRegion"), region)
-	tokenRes, err := c.getToken(ctx, clientId, clientSecret, deviceCode, userCode)
+	tokenRes, err := c.getToken(ctx, input.Region, clientId, clientSecret, input.DeviceCode, input.UserCode)
 
 	if err != nil {
 		if errors.Is(err, awssso.ErrDeviceFlowNotAuthorized) {
@@ -558,17 +599,23 @@ func (c *AwsIdentityCenterController) FinalizeRefreshAccessToken(instanceId, reg
 
 	idTokenEnc, keyId, err := c.encryptionService.Encrypt(tokenRes.IdToken)
 
-	c.errHandler.CatchWithMsg(c.logger, err, "failed to encrypt id token")
+	if err != nil {
+		return errors.Join(err, faults.ErrFatal)
+	}
 
 	accessTokenEnc, _, err := c.encryptionService.Encrypt(tokenRes.AccessToken)
 
-	c.errHandler.CatchWithMsg(c.logger, err, "failed to encrypt access token")
+	if err != nil {
+		return errors.Join(err, faults.ErrFatal)
+	}
 
 	refreshTokenEnc, _, err := c.encryptionService.Encrypt(tokenRes.RefreshToken)
 
-	c.errHandler.CatchWithMsg(c.logger, err, "failed to encrypt refresh token")
+	if err != nil {
+		return errors.Join(err, faults.ErrFatal)
+	}
 
-	c.logger.Info().Msgf("refreshing access token for instance [%s]", instanceId)
+	c.logger.Info().Msgf("refreshing access token for instance [%s]", input.InstanceId)
 
 	sql := `UPDATE aws_iam_idc_instances SET
 		id_token_enc = ?,
@@ -590,13 +637,17 @@ func (c *AwsIdentityCenterController) FinalizeRefreshAccessToken(instanceId, reg
 		c.timeHelper.NowUnix(),
 		tokenRes.ExpiresIn,
 		refreshTokenEnc,
-		keyId, instanceId)
+		keyId, input.InstanceId)
 
-	c.errHandler.CatchWithMsg(c.logger, err, "failed to persist refreshed access token to database")
+	if err != nil {
+		return errors.Join(err, faults.ErrFatal)
+	}
 
 	rowsAffected, err := res.RowsAffected()
 
-	c.errHandler.CatchWithMsg(c.logger, err, "failed to get number of rows affected")
+	if err != nil {
+		return errors.Join(err, faults.ErrFatal)
+	}
 
 	if rowsAffected != 1 {
 		return ErrInstanceWasNotFound
@@ -605,7 +656,7 @@ func (c *AwsIdentityCenterController) FinalizeRefreshAccessToken(instanceId, reg
 	return nil
 }
 
-func (c *AwsIdentityCenterController) getOrRegisterClient(ctx context.Context) (*awssso.RegistrationResponse, error) {
+func (c *AwsIdentityCenterController) getOrRegisterClient(ctx context.Context, awsRegion string) (*awssso.RegistrationResponse, error) {
 	row := c.db.QueryRowContext(ctx, "SELECT client_id, client_secret_enc, created_at, expires_at, enc_key_id FROM aws_iam_idc_clients")
 
 	var encKeyId string
@@ -617,7 +668,7 @@ func (c *AwsIdentityCenterController) getOrRegisterClient(ctx context.Context) (
 		if errors.Is(err, sql.ErrNoRows) {
 			shouldRegisterClient = true
 		} else {
-			c.errHandler.Catch(c.logger, err)
+			return nil, errors.Join(err, faults.ErrFatal)
 		}
 	}
 
@@ -625,7 +676,8 @@ func (c *AwsIdentityCenterController) getOrRegisterClient(ctx context.Context) (
 		friendlyClientName := fmt.Sprintf("swervo_%s", utils.RandomString(6))
 		c.logger.Info().Msgf("registering new client [%s]", friendlyClientName)
 
-		output, err := c.awsSsoClient.RegisterClient(ctx, friendlyClientName)
+		awsContext := context.WithValue(ctx, awssso.AwsRegion("awsRegion"), awsRegion)
+		output, err := c.awsSsoClient.RegisterClient(awsContext, friendlyClientName)
 		if err != nil {
 			c.logger.Error().Err(err).Msg("failed to register client")
 			return nil, err
@@ -633,14 +685,18 @@ func (c *AwsIdentityCenterController) getOrRegisterClient(ctx context.Context) (
 
 		clientSecretEnc, encKeyId, err := c.encryptionService.Encrypt(output.ClientSecret)
 
-		c.errHandler.CatchWithMsg(c.logger, err, "failed to encrypt client secret")
+		if err != nil {
+			return nil, errors.Join(err, faults.ErrFatal)
+		}
 
 		_, err = c.db.ExecContext(ctx, `INSERT INTO aws_iam_idc_clients
 			(client_id, client_secret_enc, created_at, expires_at, enc_key_id)
 			VALUES (?, ?, ?, ?, ?)`,
 			output.ClientId, clientSecretEnc, output.CreatedAt, output.ExpiresAt, encKeyId)
 
-		c.errHandler.CatchWithMsg(c.logger, err, "failed to save client to database")
+		if err != nil {
+			return nil, errors.Join(err, faults.ErrFatal)
+		}
 
 		c.logger.Info().Msgf("client [%s] registered successfully", friendlyClientName)
 
@@ -661,7 +717,9 @@ func (c *AwsIdentityCenterController) getOrRegisterClient(ctx context.Context) (
 
 		clientSecretEnc, encKeyId, err := c.encryptionService.Encrypt(output.ClientSecret)
 
-		c.errHandler.CatchWithMsg(c.logger, err, "failed to encrypt client secret")
+		if err != nil {
+			return nil, errors.Join(err, faults.ErrFatal)
+		}
 
 		_, err = c.db.ExecContext(ctx, `UPDATE aws_iam_idc_clients SET
 			client_id = ?,
@@ -672,7 +730,9 @@ func (c *AwsIdentityCenterController) getOrRegisterClient(ctx context.Context) (
 			WHERE client_id = ?`,
 			output.ClientId, clientSecretEnc, output.CreatedAt, output.ExpiresAt, encKeyId, result.ClientId)
 
-		c.errHandler.CatchWithMsg(c.logger, err, "failed to save client to database")
+		if err != nil {
+			return nil, errors.Join(err, faults.ErrFatal)
+		}
 
 		c.logger.Info().Msgf("client [%s] registered successfully", friendlyClientName)
 
@@ -682,14 +742,17 @@ func (c *AwsIdentityCenterController) getOrRegisterClient(ctx context.Context) (
 	var err error
 	result.ClientSecret, err = c.encryptionService.Decrypt(result.ClientSecret, encKeyId)
 
-	c.errHandler.CatchWithMsg(c.logger, err, "failed to decrypt client secret")
+	if err != nil {
+		return nil, errors.Join(err, faults.ErrFatal)
+	}
 
 	return &result, nil
 }
 
-func (c *AwsIdentityCenterController) authorizeDevice(ctx context.Context, startUrl string, clientId, clientSecret string) (*awssso.AuthorizationResponse, error) {
+func (c *AwsIdentityCenterController) authorizeDevice(ctx context.Context, startUrl, region string, clientId, clientSecret string) (*awssso.AuthorizationResponse, error) {
 	c.logger.Info().Msg("Authorizing Device")
-	output, err := c.awsSsoClient.StartDeviceAuthorization(ctx, startUrl, clientId, clientSecret)
+	awsContext := context.WithValue(ctx, awssso.AwsRegion("awsRegion"), region)
+	output, err := c.awsSsoClient.StartDeviceAuthorization(awsContext, startUrl, clientId, clientSecret)
 
 	if err != nil {
 		return nil, err
@@ -700,9 +763,11 @@ func (c *AwsIdentityCenterController) authorizeDevice(ctx context.Context, start
 	return output, nil
 }
 
-func (c *AwsIdentityCenterController) getToken(ctx context.Context, clientId, clientSecret, deviceCode, userCode string) (*awssso.GetTokenResponse, error) {
+func (c *AwsIdentityCenterController) getToken(ctx context.Context, awsRegion, clientId, clientSecret, deviceCode, userCode string) (*awssso.GetTokenResponse, error) {
+	awsContext := context.WithValue(ctx, awssso.AwsRegion("awsRegion"), awsRegion)
+
 	c.logger.Info().Msg("getting access token")
-	output, err := c.awsSsoClient.CreateToken(ctx,
+	output, err := c.awsSsoClient.CreateToken(awsContext,
 		clientId,
 		clientSecret,
 		userCode,

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/abjrcode/swervo/internal/migrations"
-	"github.com/abjrcode/swervo/internal/testhelpers"
 	"github.com/abjrcode/swervo/internal/utils"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/rs/zerolog"
@@ -18,10 +17,11 @@ func TestIsSetup(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := zerolog.Nop()
-	v := NewVault(db, utils.NewClock(), &logger, testhelpers.NewMockErrorHandler(t))
+	v := NewVault(db, utils.NewClock(), logger)
 	t.Cleanup(v.Seal)
 
-	isSetup := v.IsConfigured(context.Background())
+	isSetup, err := v.IsConfigured(context.Background())
+	require.NoError(t, err)
 
 	assert.False(t, isSetup)
 }
@@ -31,13 +31,14 @@ func TestIsSetupAfterConfigure(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := zerolog.Nop()
-	v := NewVault(db, utils.NewClock(), &logger, testhelpers.NewMockErrorHandler(t))
+	v := NewVault(db, utils.NewClock(), logger)
 	t.Cleanup(v.Seal)
 
 	err = v.Configure(context.Background(), "password")
 	require.NoError(t, err)
 
-	isSetup := v.IsConfigured(context.Background())
+	isSetup, err := v.IsConfigured(context.Background())
+	require.NoError(t, err)
 
 	assert.True(t, isSetup)
 }
@@ -48,7 +49,7 @@ func TestOpenNotConfiguredVault(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := zerolog.Nop()
-	v := NewVault(db, utils.NewClock(), &logger, testhelpers.NewMockErrorHandler(t))
+	v := NewVault(db, utils.NewClock(), logger)
 	t.Cleanup(v.Seal)
 
 	_, err = v.Open(context.Background(), "password")
@@ -62,7 +63,7 @@ func TestConfigureVault(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := zerolog.Nop()
-	v := NewVault(db, utils.NewClock(), &logger, testhelpers.NewMockErrorHandler(t))
+	v := NewVault(db, utils.NewClock(), logger)
 	t.Cleanup(v.Seal)
 
 	err = v.Configure(context.Background(), "password")
@@ -75,7 +76,7 @@ func TestConfigureVaultTwice(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := zerolog.Nop()
-	v := NewVault(db, utils.NewClock(), &logger, testhelpers.NewMockErrorHandler(t))
+	v := NewVault(db, utils.NewClock(), logger)
 	t.Cleanup(v.Seal)
 
 	err = v.Configure(context.Background(), "password")
@@ -90,7 +91,7 @@ func TestOpenVaultCorrectPassword(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := zerolog.Nop()
-	v := NewVault(db, utils.NewClock(), &logger, testhelpers.NewMockErrorHandler(t))
+	v := NewVault(db, utils.NewClock(), logger)
 	t.Cleanup(v.Seal)
 
 	err = v.Configure(context.Background(), "123")
@@ -107,7 +108,7 @@ func TestVault_OpenTwice(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := zerolog.Nop()
-	v := NewVault(db, utils.NewClock(), &logger, testhelpers.NewMockErrorHandler(t))
+	v := NewVault(db, utils.NewClock(), logger)
 	t.Cleanup(v.Seal)
 
 	err = v.Configure(context.Background(), "123")
@@ -127,7 +128,7 @@ func TestOpenVaultWithWrongPassword(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := zerolog.Nop()
-	vault := NewVault(db, utils.NewClock(), &logger, testhelpers.NewMockErrorHandler(t))
+	vault := NewVault(db, utils.NewClock(), logger)
 	t.Cleanup(vault.Seal)
 
 	err = vault.Configure(context.Background(), "123")
@@ -145,7 +146,7 @@ func TestEncryptDecrypt(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := zerolog.Nop()
-	vault := NewVault(db, utils.NewClock(), &logger, testhelpers.NewMockErrorHandler(t))
+	vault := NewVault(db, utils.NewClock(), logger)
 	t.Cleanup(vault.Seal)
 
 	err = vault.Configure(context.Background(), "123")
@@ -165,7 +166,7 @@ func TestEncryptDecryptAfterVaultSealAndOpen(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := zerolog.Nop()
-	vault := NewVault(db, utils.NewClock(), &logger, testhelpers.NewMockErrorHandler(t))
+	vault := NewVault(db, utils.NewClock(), logger)
 	t.Cleanup(vault.Seal)
 
 	err = vault.Configure(context.Background(), "123")
@@ -190,7 +191,7 @@ func TestEncryptDecryptWithWrongPassword(t *testing.T) {
 	originalDb, err := migrations.NewInMemoryMigratedDatabase(t, "TestEncryptDecryptWithWrongPasswordOriginal")
 	require.NoError(t, err)
 	logger := zerolog.Nop()
-	originalVault := NewVault(originalDb, utils.NewClock(), &logger, testhelpers.NewMockErrorHandler(t))
+	originalVault := NewVault(originalDb, utils.NewClock(), logger)
 	err = originalVault.Configure(context.Background(), "123")
 	require.NoError(t, err)
 	encrypted, keyId, err := originalVault.Encrypt("hello")
@@ -199,7 +200,7 @@ func TestEncryptDecryptWithWrongPassword(t *testing.T) {
 
 	newDb, err := migrations.NewInMemoryMigratedDatabase(t, "TestEncryptDecryptWithWrongPasswordNew")
 	require.NoError(t, err)
-	newVault := NewVault(newDb, utils.NewClock(), &logger, testhelpers.NewMockErrorHandler(t))
+	newVault := NewVault(newDb, utils.NewClock(), logger)
 	err = newVault.Configure(context.Background(), "321")
 	require.NoError(t, err)
 	_, err = newVault.Decrypt(encrypted, keyId)
@@ -212,7 +213,7 @@ func TestEncryptDecryptErrorOnSealedVault(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := zerolog.Nop()
-	vault := NewVault(db, utils.NewClock(), &logger, testhelpers.NewMockErrorHandler(t))
+	vault := NewVault(db, utils.NewClock(), logger)
 
 	err = vault.Configure(context.Background(), "123")
 	require.NoError(t, err)

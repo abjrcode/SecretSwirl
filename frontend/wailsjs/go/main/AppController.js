@@ -10,6 +10,10 @@ export function Init(arg1, arg2) {
   return window['go']['main']['AppController']['Init'](arg1, arg2);
 }
 
+export function RunAppCommand(arg1, arg2) {
+  return window['go']['main']['AppController']['RunAppCommand'](arg1, arg2);
+}
+
 export function ShowErrorDialog(arg1) {
   return window['go']['main']['AppController']['ShowErrorDialog'](arg1);
 }

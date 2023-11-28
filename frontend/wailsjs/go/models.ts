@@ -28,6 +28,78 @@ export namespace awsiamidc {
 	        this.deviceCode = source["deviceCode"];
 	    }
 	}
+	export class AwsIamIdc_FinalizeRefreshAccessTokenCommandInput {
+	    instanceId: string;
+	    region: string;
+	    userCode: string;
+	    deviceCode: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AwsIamIdc_FinalizeRefreshAccessTokenCommandInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.instanceId = source["instanceId"];
+	        this.region = source["region"];
+	        this.userCode = source["userCode"];
+	        this.deviceCode = source["deviceCode"];
+	    }
+	}
+	export class AwsIamIdc_FinalizeSetupCommandInput {
+	    clientId: string;
+	    startUrl: string;
+	    awsRegion: string;
+	    label: string;
+	    userCode: string;
+	    deviceCode: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AwsIamIdc_FinalizeSetupCommandInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.clientId = source["clientId"];
+	        this.startUrl = source["startUrl"];
+	        this.awsRegion = source["awsRegion"];
+	        this.label = source["label"];
+	        this.userCode = source["userCode"];
+	        this.deviceCode = source["deviceCode"];
+	    }
+	}
+	export class AwsIamIdc_GetRoleCredentialsCommandInput {
+	    instanceId: string;
+	    accountId: string;
+	    roleName: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AwsIamIdc_GetRoleCredentialsCommandInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.instanceId = source["instanceId"];
+	        this.accountId = source["accountId"];
+	        this.roleName = source["roleName"];
+	    }
+	}
+	export class AwsIamIdc_SetupCommandInput {
+	    startUrl: string;
+	    awsRegion: string;
+	    label: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AwsIamIdc_SetupCommandInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.startUrl = source["startUrl"];
+	        this.awsRegion = source["awsRegion"];
+	        this.label = source["label"];
+	    }
+	}
 	export class AwsIdentityCenterAccountRole {
 	    roleName: string;
 	
@@ -140,6 +212,30 @@ export namespace awsiamidc {
 
 export namespace main {
 	
+	export class Auth_ConfigureVaultCommandInput {
+	    password: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Auth_ConfigureVaultCommandInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.password = source["password"];
+	    }
+	}
+	export class Auth_UnlockCommandInput {
+	    password: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Auth_UnlockCommandInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.password = source["password"];
+	    }
+	}
 	export class FavoriteInstance {
 	    providerCode: string;
 	    instanceId: string;

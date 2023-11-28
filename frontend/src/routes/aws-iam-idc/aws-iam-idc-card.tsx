@@ -1,11 +1,5 @@
 import React from "react"
 import { useFetcher, useNavigate, useRevalidator } from "react-router-dom"
-import {
-  GetRoleCredentials,
-  MarkAsFavorite,
-  RefreshAccessToken,
-  UnmarkAsFavorite,
-} from "../../../wailsjs/go/awsiamidc/AwsIdentityCenterController"
 
 import {
   AwsIamIdcCardDataError,
@@ -13,6 +7,12 @@ import {
 } from "./aws-iam-idc-card-data"
 import { useWails } from "../../wails-provider/wails-context"
 import { useToaster } from "../../toast-provider/toast-context"
+import {
+  AwsIamIdc_GetRoleCredentials,
+  AwsIamIdc_MarkAsFavorite,
+  AwsIamIdc_RefreshAccessToken,
+  AwsIamIdc_UnmarkAsFavorite,
+} from "../../utils/ipc-adapter"
 
 export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
   const wails = useWails()
@@ -22,7 +22,7 @@ export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
   const validator = useRevalidator()
 
   async function authorizeDevice(instanceId: string) {
-    const deviceAuthFlowResult = await RefreshAccessToken(instanceId)
+    const deviceAuthFlowResult = await AwsIamIdc_RefreshAccessToken(instanceId)
 
     navigate("/providers/aws-iam-idc/device-auth", {
       state: {
@@ -57,12 +57,12 @@ export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
   }
 
   async function markAsFavorite() {
-    await MarkAsFavorite(instanceId)
+    await AwsIamIdc_MarkAsFavorite(instanceId)
     validator.revalidate()
   }
 
   async function unmarkAsFavorite() {
-    await UnmarkAsFavorite(instanceId)
+    await AwsIamIdc_UnmarkAsFavorite(instanceId)
     validator.revalidate()
   }
 
@@ -71,7 +71,11 @@ export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
     accountId: string,
     roleName: string,
   ) {
-    const output = await GetRoleCredentials(instanceId, accountId, roleName)
+    const output = await AwsIamIdc_GetRoleCredentials({
+      instanceId,
+      accountId,
+      roleName,
+    })
     const credentialsProfile = `
     [default]
     aws_access_key_id = ${output.accessKeyId}

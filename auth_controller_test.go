@@ -17,67 +17,71 @@ func initAuthController(t *testing.T) (*AuthController, *testhelpers.MockClock) 
 
 	logger := zerolog.Nop()
 	mockClock := testhelpers.NewMockClock()
-	mockErrHandler := testhelpers.NewMockErrorHandler(t)
 
-	vault := vault.NewVault(db, mockClock, &logger, mockErrHandler)
+	vault := vault.NewVault(db, mockClock, logger)
 
-	controller := &AuthController{
-		vault: vault,
-	}
-
-	ctx := logger.WithContext(context.Background())
-
-	controller.Init(ctx, mockErrHandler)
+	controller := NewAuthController(vault, logger)
 
 	return controller, mockClock
 }
 
 func TestAuthController_IsVaultConfigured(t *testing.T) {
 	controller, mockTimeProvider := initAuthController(t)
+	ctx := context.TODO()
 
-	require.False(t, controller.IsVaultConfigured())
-
-	mockTimeProvider.On("NowUnix").Return(1)
-	err := controller.ConfigureVault("password")
+	isVaultConfigured, err := controller.IsVaultConfigured(ctx)
 	require.NoError(t, err)
 
-	require.True(t, controller.IsVaultConfigured())
+	require.False(t, isVaultConfigured)
+
+	mockTimeProvider.On("NowUnix").Return(1)
+	err = controller.ConfigureVault(ctx, Auth_ConfigureVaultCommandInput{Password: "password"})
+	require.NoError(t, err)
+
+	isVaultConfigured, err = controller.IsVaultConfigured(ctx)
+	require.NoError(t, err)
+	require.True(t, isVaultConfigured)
 }
 
 func TestAuthController_ConfigureVault(t *testing.T) {
 	controller, mockTimeProvider := initAuthController(t)
+	ctx := context.TODO()
 
 	mockTimeProvider.On("NowUnix").Return(1)
-	err := controller.ConfigureVault("password")
+	err := controller.ConfigureVault(ctx, Auth_ConfigureVaultCommandInput{Password: "password"})
 	require.NoError(t, err)
 
-	require.True(t, controller.IsVaultConfigured())
+	isVaultConfigured, err := controller.IsVaultConfigured(ctx)
+	require.NoError(t, err)
+	require.True(t, isVaultConfigured)
 }
 
 func TestAuthController_UnlockVault(t *testing.T) {
 	controller, mockTimeProvider := initAuthController(t)
+	ctx := context.TODO()
 
 	mockTimeProvider.On("NowUnix").Return(1)
-	err := controller.ConfigureVault("password")
+	err := controller.ConfigureVault(ctx, Auth_ConfigureVaultCommandInput{Password: "password"})
 	require.NoError(t, err)
 
 	mockTimeProvider.On("NowUnix").Return(2)
-	unlocked, err := controller.UnlockVault("password")
+	unlocked, err := controller.UnlockVault(ctx, Auth_UnlockCommandInput{Password: "password"})
 	require.NoError(t, err)
 	require.True(t, unlocked)
 }
 
 func TestAuthController_UnlockVault_WithWrongPassword(t *testing.T) {
 	controller, mockTimeProvider := initAuthController(t)
+	ctx := context.TODO()
 
 	mockTimeProvider.On("NowUnix").Return(1)
-	err := controller.ConfigureVault("password")
+	err := controller.ConfigureVault(ctx, Auth_ConfigureVaultCommandInput{Password: "password"})
 	require.NoError(t, err)
 
 	controller.LockVault()
 
 	mockTimeProvider.On("NowUnix").Return(2)
-	unlocked, err := controller.UnlockVault("wrong-password")
+	unlocked, err := controller.UnlockVault(ctx, Auth_UnlockCommandInput{Password: "wrong-password"})
 	require.NoError(t, err)
 	require.False(t, unlocked)
 }
@@ -85,7 +89,10 @@ func TestAuthController_UnlockVault_WithWrongPassword(t *testing.T) {
 func TestAuthController_UnlockVault_WithoutConfiguringFirst(t *testing.T) {
 	controller, _ := initAuthController(t)
 
-	_, err := controller.UnlockVault("password")
+	_, err := controller.UnlockVault(context.TODO(), Auth_UnlockCommandInput{
+		Password: "password",
+	})
+
 	require.Error(t, err, vault.ErrVaultNotConfigured)
 }
 
@@ -97,9 +104,10 @@ func TestAuthController_LockVault_WithoutConfiguringFirst(t *testing.T) {
 
 func TestAuthController_LockVault_WithoutUnlockingFirst(t *testing.T) {
 	controller, mockTimeProvider := initAuthController(t)
+	ctx := context.TODO()
 
 	mockTimeProvider.On("NowUnix").Return(1)
-	err := controller.ConfigureVault("password")
+	err := controller.ConfigureVault(ctx, Auth_ConfigureVaultCommandInput{Password: "password"})
 	require.NoError(t, err)
 
 	controller.LockVault()
@@ -107,13 +115,14 @@ func TestAuthController_LockVault_WithoutUnlockingFirst(t *testing.T) {
 
 func TestAuthController_UnlockVault_WithoutLockingFirst(t *testing.T) {
 	controller, mockTimeProvider := initAuthController(t)
+	ctx := context.TODO()
 
 	mockTimeProvider.On("NowUnix").Return(1)
-	err := controller.ConfigureVault("password")
+	err := controller.ConfigureVault(ctx, Auth_ConfigureVaultCommandInput{Password: "password"})
 	require.NoError(t, err)
 
 	mockTimeProvider.On("NowUnix").Return(2)
-	unlocked, err := controller.UnlockVault("password")
+	unlocked, err := controller.UnlockVault(ctx, Auth_UnlockCommandInput{Password: "password"})
 	require.NoError(t, err)
 	require.True(t, unlocked)
 }
