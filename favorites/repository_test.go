@@ -15,7 +15,7 @@ func TestAddFavorite(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := zerolog.Nop()
-	repo := NewFavorites(db, &logger)
+	repo := NewFavorites(db, logger)
 
 	favorite := &Favorite{
 		ProviderCode: providers.AwsIamIdc,
@@ -39,7 +39,7 @@ func TestRemoveFavorite(t *testing.T) {
 
 	logger := zerolog.Nop()
 
-	repo := NewFavorites(db, &logger)
+	repo := NewFavorites(db, logger)
 	ctx := context.Background()
 
 	favorite := &Favorite{
@@ -71,7 +71,7 @@ func TestIsFavorite(t *testing.T) {
 
 	logger := zerolog.Nop()
 
-	repo := NewFavorites(db, &logger)
+	repo := NewFavorites(db, logger)
 	ctx := context.Background()
 
 	favorite := &Favorite{

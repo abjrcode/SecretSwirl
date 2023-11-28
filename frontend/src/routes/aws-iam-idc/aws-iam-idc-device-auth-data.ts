@@ -1,6 +1,6 @@
 import { ActionFunctionArgs } from "react-router-dom"
-import { FinalizeRefreshAccessToken, FinalizeSetup } from "../../../wailsjs/go/awsiamidc/AwsIdentityCenterController"
-import { ActionDataResult } from "../../components/action-data-result"
+import { AwsIamIdc_FinalizeRefreshAccessToken, AwsIamIdc_FinalizeSetup } from "../../utils/ipc-adapter"
+import { ActionDataResult } from "../../utils/action-data-result"
 
 export enum AwsIamIdcDeviceAuthFlowError {
   ErrDeviceAuthFlowNotAuthorized = "DEVICE_AUTH_FLOW_NOT_AUTHORIZED",
@@ -29,10 +29,23 @@ export async function awsIamIdcDeviceAuthAction({ request }: ActionFunctionArgs)
   try {
     switch (action) {
       case "setup":
-        await FinalizeSetup(clientId, startUrl, awsRegion, label, userCode, deviceCode)
+        await AwsIamIdc_FinalizeSetup({
+          startUrl,
+          awsRegion,
+          label,
+          clientId,
+          deviceCode,
+          userCode,
+        })
         break;
       case "refresh":
-        await FinalizeRefreshAccessToken(instanceId, awsRegion, userCode, deviceCode)
+        await AwsIamIdc_FinalizeRefreshAccessToken({
+          instanceId,
+          region: awsRegion,
+          deviceCode,
+          userCode,
+        }
+        )
         break;
       default:
         throw new Error(`Unknown action: ${action}`)

@@ -1,9 +1,7 @@
 import { ActionFunctionArgs } from "react-router-dom"
-import {
-  Setup,
-} from "../../../wailsjs/go/awsiamidc/AwsIdentityCenterController"
 import { awsiamidc } from "../../../wailsjs/go/models"
-import { ActionDataResult } from "../../components/action-data-result"
+import { ActionDataResult } from "../../utils/action-data-result"
+import { AwsIamIdc_Setup } from "../../utils/ipc-adapter"
 
 export enum AwsIamIdcSetupError {
   ErrInstanceAlreadyRegistered = "INSTANCE_ALREADY_REGISTERED",
@@ -26,7 +24,11 @@ export async function awsIamIdcSetupAction({ request }: ActionFunctionArgs): Pro
   try {
     return {
       success: true,
-      result: await Setup(startUrl, awsRegion, label)
+      result: await AwsIamIdc_Setup({
+        startUrl,
+        awsRegion,
+        label,
+      })
     }
   } catch (e) {
     switch (e) {

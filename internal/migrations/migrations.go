@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"github.com/abjrcode/swervo/internal/datastore"
-	"github.com/abjrcode/swervo/internal/logging"
+	"github.com/abjrcode/swervo/internal/faults"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/sqlite3"
 	"github.com/golang-migrate/migrate/v4/source"
@@ -22,11 +22,10 @@ var DefaultMigrationsFs embed.FS
 type MigrationRunner struct {
 	migrationSource *source.Driver
 	appStore        *datastore.AppStore
-	logger          *zerolog.Logger
-	errHandler      logging.ErrorHandler
+	logger          zerolog.Logger
 }
 
-func New(migrationsFsys fs.FS, migrationsPath string, appStore *datastore.AppStore, logger zerolog.Logger, errHandler logging.ErrorHandler) (*MigrationRunner, error) {
+func New(migrationsFsys fs.FS, migrationsPath string, appStore *datastore.AppStore, logger zerolog.Logger) (*MigrationRunner, error) {
 	migrationsSrc, err := iofs.New(migrationsFsys, migrationsPath)
 
 	if err != nil {
@@ -41,13 +40,12 @@ func New(migrationsFsys fs.FS, migrationsPath string, appStore *datastore.AppSto
 	return &MigrationRunner{
 		migrationSource: &migrationsSrc,
 		appStore:        appStore,
-		logger:          &enrichedLogger,
-		errHandler:      errHandler,
+		logger:          enrichedLogger,
 	}, nil
 }
 
 type proxyLogger struct {
-	logger *zerolog.Logger
+	logger zerolog.Logger
 }
 
 func (l *proxyLogger) Printf(format string, v ...interface{}) {
@@ -131,20 +129,24 @@ func (runner *MigrationRunner) up(db *sql.DB) error {
 func (runner *MigrationRunner) RunSafe() error {
 	db, err := runner.appStore.Open()
 
-	runner.errHandler.CatchWithMsg(runner.logger, err, "could not open database")
+	if err != nil {
+		errors.Join(errors.New("could not open database"), faults.ErrFatal)
+	}
 
 	defer db.Close()
 
 	shouldRunMigrations, currentVersion, nextUp, err := runner.shouldRunMigrations(db)
 
-	runner.errHandler.CatchWithMsg(runner.logger, err, "could not determine if migrations should run")
+	if err != nil {
+		return errors.Join(errors.New("could not determine if migrations should run"), err, faults.ErrFatal)
+	}
 
 	runner.logger.Debug().Msgf("shouldRunMigrations: %t, currentVersion: %d, nextUp: %d", shouldRunMigrations, currentVersion, nextUp)
 
 	if shouldRunMigrations {
 		runner.logger.Info().Msg("taking a database backup")
 		if err := runner.appStore.TakeBackup(); err != nil {
-			runner.errHandler.CatchWithMsg(runner.logger, err, "could not take database backup")
+			return errors.Join(errors.New("could not take database backup"), err, faults.ErrFatal)
 		}
 
 		runner.logger.Info().Msgf("migrating database from @[%d] to @[%d]", currentVersion, nextUp)

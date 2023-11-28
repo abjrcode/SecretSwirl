@@ -21,16 +21,16 @@ type FavoritesRepo interface {
 }
 
 type favoritesImpl struct {
-	logger *zerolog.Logger
+	logger zerolog.Logger
 	db     *sql.DB
 }
 
-func NewFavorites(db *sql.DB, logger *zerolog.Logger) FavoritesRepo {
+func NewFavorites(db *sql.DB, logger zerolog.Logger) FavoritesRepo {
 	enrichedLogger := logger.With().Str("component", "favorites_repo").Logger()
 
 	return &favoritesImpl{
 		db:     db,
-		logger: &enrichedLogger,
+		logger: enrichedLogger,
 	}
 }
 

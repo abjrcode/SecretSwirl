@@ -1,4 +1,5 @@
-import { ListFavorites } from "../../../wailsjs/go/main/DashboardController"
+import { Dashboard_ListFavorites } from "../../utils/ipc-adapter"
+
 export async function dashboardLoader() {
-  return ListFavorites()
+  return Dashboard_ListFavorites()
 }
