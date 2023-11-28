@@ -14,13 +14,13 @@ import { awsIamIdcSetupAction } from "./routes/aws-iam-idc/aws-iam-idc-setup-dat
 import { Vault } from "./routes/vault/vault"
 import { AuthProvider } from "./auth-provider/auth-provider"
 import { ErrorPage } from "./error-page"
-import { IsVaultConfigured } from "../wailsjs/go/main/AuthController"
 import { WailsProvider } from "./wails-provider/wails-provider"
 import { AwsIamIdcDeviceAuth } from "./routes/aws-iam-idc/aws-iam-idc-device-auth"
 import { awsIamIdcDeviceAuthAction } from "./routes/aws-iam-idc/aws-iam-idc-device-auth-data"
 import { ToastProvider } from "./toast-provider/toast-provider"
 import { AwsIamIdcInstances } from "./routes/aws-iam-idc/aws-iam-idc-instances"
 import { awsIamIdcInstancesData } from "./routes/aws-iam-idc/aws-iam-idc-instances-data"
+import { Auth_IsVaultConfigured } from "./utils/ipc-adapter"
 
 const devMode = import.meta.env.DEV
 
@@ -33,7 +33,7 @@ console.log("starting frontend application ...")
 void (async function main() {
   const router = createHashRouter([
     {
-      element: <Vault isVaultConfigured={await IsVaultConfigured()} />,
+      element: <Vault isVaultConfigured={await Auth_IsVaultConfigured()} />,
       errorElement: <ErrorPage devMode />,
       children: [
         {

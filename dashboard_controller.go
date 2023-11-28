@@ -2,17 +2,16 @@ package main
 
 import (
 	"context"
+	"errors"
 
 	"github.com/abjrcode/swervo/favorites"
-	"github.com/abjrcode/swervo/internal/logging"
+	"github.com/abjrcode/swervo/internal/faults"
 	"github.com/abjrcode/swervo/providers"
 	"github.com/rs/zerolog"
 )
 
 type DashboardController struct {
-	ctx           context.Context
-	logger        *zerolog.Logger
-	errorHandler  logging.ErrorHandler
+	logger        zerolog.Logger
 	favoritesRepo favorites.FavoritesRepo
 }
 
@@ -29,19 +28,7 @@ type FavoriteInstance struct {
 
 var supportedProviders []Provider
 
-func NewDashboardController(favoritesRepo favorites.FavoritesRepo) *DashboardController {
-
-	return &DashboardController{
-		favoritesRepo: favoritesRepo,
-	}
-}
-
-func (c *DashboardController) Init(ctx context.Context, errorHandler logging.ErrorHandler) {
-	c.ctx = ctx
-	enrichedLogger := zerolog.Ctx(ctx).With().Str("component", "dashboard_controller").Logger()
-	c.logger = &enrichedLogger
-	c.errorHandler = errorHandler
-
+func NewDashboardController(favoritesRepo favorites.FavoritesRepo, logger zerolog.Logger) *DashboardController {
 	supportedProviders = make([]Provider, 0, len(providers.SupportedProviders))
 	for _, provider := range providers.SupportedProviders {
 		supportedProviders = append(supportedProviders, Provider{
@@ -49,13 +36,20 @@ func (c *DashboardController) Init(ctx context.Context, errorHandler logging.Err
 			Name: provider.Name,
 		})
 	}
+
+	enrichedLogger := logger.With().Str("component", "dashboard_controller").Logger()
+
+	return &DashboardController{
+		favoritesRepo: favoritesRepo,
+		logger:        enrichedLogger,
+	}
 }
 
-func (c *DashboardController) ListFavorites() ([]FavoriteInstance, error) {
-	favorites, err := c.favoritesRepo.ListAll(c.ctx)
+func (c *DashboardController) ListFavorites(ctx context.Context) ([]FavoriteInstance, error) {
+	favorites, err := c.favoritesRepo.ListAll(ctx)
 
 	if err != nil {
-		c.errorHandler.Catch(c.logger, err)
+		return nil, errors.Join(err, faults.ErrFatal)
 	}
 
 	favoriteInstances := make([]FavoriteInstance, 0, len(favorites))

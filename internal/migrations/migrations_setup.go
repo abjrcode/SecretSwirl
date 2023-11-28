@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/abjrcode/swervo/internal/datastore"
-	"github.com/abjrcode/swervo/internal/testhelpers"
 	"github.com/abjrcode/swervo/internal/utils"
 	"github.com/rs/zerolog"
 )
@@ -25,7 +24,7 @@ func NewInMemoryMigratedDatabase(t *testing.T, dbName string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	migrationRunner, err := New(DefaultMigrationsFs, "scripts", store, zerolog.Nop(), testhelpers.NewMockErrorHandler(t))
+	migrationRunner, err := New(DefaultMigrationsFs, "scripts", store, zerolog.Nop())
 
 	if err != nil {
 		return nil, err

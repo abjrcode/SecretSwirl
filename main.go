@@ -13,11 +13,12 @@ import (
 	"github.com/abjrcode/swervo/favorites"
 	"github.com/abjrcode/swervo/internal/config"
 	"github.com/abjrcode/swervo/internal/datastore"
+	"github.com/abjrcode/swervo/internal/faults"
 	"github.com/abjrcode/swervo/internal/logging"
 	"github.com/abjrcode/swervo/internal/migrations"
 	"github.com/abjrcode/swervo/internal/security/vault"
 	"github.com/abjrcode/swervo/internal/utils"
-	awsiamidc "github.com/abjrcode/swervo/providers/aws-iam-idc"
+	awsiamidc "github.com/abjrcode/swervo/providers/aws_iam_idc"
 
 	_ "github.com/golang-migrate/migrate/v4/database/sqlite3"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -68,7 +69,7 @@ func main() {
 
 	logger := logging.InitLogger(logFile, Version, CommitSha)
 
-	errorHandler := logging.NewErrorHandler()
+	errorHandler := faults.NewErrorHandler()
 
 	logger.Info().Msgf("Swervo version: %s, commit SHA: %s", Version, CommitSha)
 	logger.Info().Msgf("app data directory: [%s]", appDataDir)
@@ -77,32 +78,37 @@ func main() {
 
 	if !generateBindingsRun {
 		dataStore := datastore.New(appDataDir, "swervo.db")
-		migrationRunner, err := migrations.New(migrations.DefaultMigrationsFs, "scripts", dataStore, logger, errorHandler)
+		migrationRunner, err := migrations.New(migrations.DefaultMigrationsFs, "scripts", dataStore, logger)
 
-		errorHandler.CatchWithMsg(&logger, err, "could not read migrations from embedded filesystem")
+		errorHandler.CatchWithMsg(logger, err, "could not read migrations from embedded filesystem")
 
 		if err := migrationRunner.RunSafe(); err != nil {
-			errorHandler.CatchWithMsg(&logger, err, "error when running migrations")
+			errorHandler.CatchWithMsg(logger, err, "error when running migrations")
 		}
 
 		sqlDb, err = dataStore.Open()
 
-		errorHandler.CatchWithMsg(&logger, err, "could not open database")
+		errorHandler.CatchWithMsg(logger, err, "could not open database")
 
 		defer sqlDb.Close()
 	}
 
-	appController := NewAppController()
 	timeProvider := utils.NewClock()
-	vault := vault.NewVault(sqlDb, timeProvider, &logger, errorHandler)
+	vault := vault.NewVault(sqlDb, timeProvider, logger)
 	defer vault.Seal()
 
-	authController := NewAuthController(vault)
+	authController := NewAuthController(vault, logger)
 
-	favoritesRepo := favorites.NewFavorites(sqlDb, &logger)
-	dashboardController := NewDashboardController(favoritesRepo)
+	favoritesRepo := favorites.NewFavorites(sqlDb, logger)
+	dashboardController := NewDashboardController(favoritesRepo, logger)
 
-	awsIdcController := awsiamidc.NewAwsIdentityCenterController(sqlDb, favoritesRepo, vault, awssso.NewAwsSsoOidcClient(), timeProvider)
+	awsIdcController := awsiamidc.NewAwsIdentityCenterController(sqlDb, favoritesRepo, vault, awssso.NewAwsSsoOidcClient(), timeProvider, logger)
+
+	appController := &AppController{
+		authController:      authController,
+		dashboardController: dashboardController,
+		awsIamIdcController: awsIdcController,
+	}
 
 	logger.Info().Msgf("PID [%d] - launching Swervo", os.Getpid())
 	if err := wails.Run(&options.App{
@@ -118,9 +124,6 @@ func main() {
 			errorHandler.InitWailsContext(&ctx)
 
 			appController.Init(logger.WithContext(ctx), errorHandler)
-			authController.Init(logger.WithContext(ctx), errorHandler)
-			dashboardController.Init(logger.WithContext(ctx), errorHandler)
-			awsIdcController.Init(logger.WithContext(ctx), errorHandler)
 		},
 		Bind: []interface{}{
 			appController,
@@ -129,6 +132,6 @@ func main() {
 			awsIdcController,
 		},
 	}); err != nil {
-		errorHandler.Catch(&logger, errors.New("failed to launch Swervo"))
+		errorHandler.Catch(logger, errors.New("failed to launch Swervo"))
 	}
 }
