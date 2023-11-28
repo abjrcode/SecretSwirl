@@ -1,5 +1,5 @@
-import { ListInstances } from "../../../wailsjs/go/awsiamidc/AwsIdentityCenterController";
+import { AwsIamIdc_ListInstances } from "../../utils/ipc-adapter";
 
 export function awsIamIdcInstancesData() {
-  return ListInstances()
+  return AwsIamIdc_ListInstances()
 }

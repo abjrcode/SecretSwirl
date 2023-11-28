@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/abjrcode/swervo/internal/logging"
+	"github.com/abjrcode/swervo/internal/faults"
 	"github.com/rs/zerolog"
 )
 
@@ -13,7 +13,7 @@ type mockErrorHandler struct {
 	wailsCtx *context.Context
 }
 
-func NewMockErrorHandler(t *testing.T) logging.ErrorHandler {
+func NewMockErrorHandler(t *testing.T) faults.ErrorHandler {
 	return &mockErrorHandler{
 		t: t,
 	}
@@ -23,11 +23,11 @@ func (eh *mockErrorHandler) InitWailsContext(ctx *context.Context) {
 	eh.wailsCtx = ctx
 }
 
-func (eh *mockErrorHandler) Catch(logger *zerolog.Logger, err error) {
+func (eh *mockErrorHandler) Catch(logger zerolog.Logger, err error) {
 	eh.CatchWithMsg(logger, err, "")
 }
 
-func (eh *mockErrorHandler) CatchWithMsg(logger *zerolog.Logger, err error, msg string) {
+func (eh *mockErrorHandler) CatchWithMsg(logger zerolog.Logger, err error, msg string) {
 	if err != nil {
 		eh.t.Fatalf("Error: %v, Msg: %s", err, msg)
 	}

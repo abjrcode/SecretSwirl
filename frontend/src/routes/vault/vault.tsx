@@ -1,10 +1,10 @@
 import { Outlet } from "react-router-dom"
-import { ConfigureVault, UnlockVault } from "../../../wailsjs/go/main/AuthController"
 import { Layout } from "../../layout"
 import { useAuth } from "../../auth-provider/auth-context"
 import { VaultBuilder } from "./vault-builder"
 import { VaultDoor } from "./vault-door"
 import { useState } from "react"
+import { Auth_ConfigureVault, Auth_Unlock } from "../../utils/ipc-adapter"
 
 export function Vault(props: { isVaultConfigured: boolean }) {
   const authContext = useAuth()
@@ -12,13 +12,13 @@ export function Vault(props: { isVaultConfigured: boolean }) {
   const [isVaultConfigured, setIsVaultConfigured] = useState(props.isVaultConfigured)
 
   async function buildVault(password: string) {
-    await ConfigureVault(password)
+    await Auth_ConfigureVault(password)
     setIsVaultConfigured(true)
     authContext.onVaultConfigured()
   }
 
   async function attemptUnlock(password: string) {
-    const success = await UnlockVault(password)
+    const success = await Auth_Unlock(password)
     if (success) {
       authContext.onVaultUnlocked()
     } else {

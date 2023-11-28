@@ -1,6 +1,6 @@
-import { GetInstanceData } from '../../../wailsjs/go/awsiamidc/AwsIdentityCenterController'
 import { awsiamidc } from '../../../wailsjs/go/models'
-import { ActionDataResult } from '../../components/action-data-result'
+import { ActionDataResult } from '../../utils/action-data-result'
+import { AwsIamIdc_GetInstanceData } from '../../utils/ipc-adapter'
 
 export enum AwsIamIdcCardDataError {
   ErrAccessTokenExpired = "ACCESS_TOKEN_EXPIRED",
@@ -18,7 +18,7 @@ export async function awsIamIdcCardLoader({ request }: { request: Request }): Pr
   }
 
   try {
-    return { success: true, result: await GetInstanceData(instanceId, refresh) }
+    return { success: true, result: await AwsIamIdc_GetInstanceData(instanceId, refresh) }
   }
   catch (error) {
     switch (error) {
