@@ -21,11 +21,11 @@ var DefaultMigrationsFs embed.FS
 
 type MigrationRunner struct {
 	migrationSource *source.Driver
-	appStore        *datastore.AppStore
+	appStore        datastore.AppStore
 	logger          zerolog.Logger
 }
 
-func New(migrationsFsys fs.FS, migrationsPath string, appStore *datastore.AppStore, logger zerolog.Logger) (*MigrationRunner, error) {
+func NewMigrationRunner(migrationsFsys fs.FS, migrationsPath string, appStore datastore.AppStore, logger zerolog.Logger) (*MigrationRunner, error) {
 	migrationsSrc, err := iofs.New(migrationsFsys, migrationsPath)
 
 	if err != nil {
@@ -133,7 +133,7 @@ func (runner *MigrationRunner) RunSafe() error {
 		errors.Join(errors.New("could not open database"), faults.ErrFatal)
 	}
 
-	defer db.Close()
+	defer runner.appStore.Close(db)
 
 	shouldRunMigrations, currentVersion, nextUp, err := runner.shouldRunMigrations(db)
 
