@@ -74,11 +74,16 @@ func main() {
 	logger.Info().Msgf("Swervo version: %s, commit SHA: %s", Version, CommitSha)
 	logger.Info().Msgf("app data directory: [%s]", appDataDir)
 
-	var sqlDb *sql.DB
+	dataStore := datastore.New(appDataDir, "swervo.db")
+	var db *sql.DB
 
 	if !generateBindingsRun {
-		dataStore := datastore.New(appDataDir, "swervo.db")
-		migrationRunner, err := migrations.New(migrations.DefaultMigrationsFs, "scripts", dataStore, logger)
+		db, err = dataStore.Open()
+		if err != nil {
+			errorHandler.CatchWithMsg(logger, err, "failed to open database")
+		}
+		defer dataStore.Close(db)
+		migrationRunner, err := migrations.NewMigrationRunner(migrations.DefaultMigrationsFs, "scripts", dataStore, logger)
 
 		errorHandler.CatchWithMsg(logger, err, "could not read migrations from embedded filesystem")
 
@@ -86,23 +91,18 @@ func main() {
 			errorHandler.CatchWithMsg(logger, err, "error when running migrations")
 		}
 
-		sqlDb, err = dataStore.Open()
-
-		errorHandler.CatchWithMsg(logger, err, "could not open database")
-
-		defer sqlDb.Close()
 	}
 
 	timeProvider := utils.NewClock()
-	vault := vault.NewVault(sqlDb, timeProvider, logger)
+	vault := vault.NewVault(db, timeProvider, logger)
 	defer vault.Seal()
 
 	authController := NewAuthController(vault, logger)
 
-	favoritesRepo := favorites.NewFavorites(sqlDb, logger)
+	favoritesRepo := favorites.NewFavorites(db, logger)
 	dashboardController := NewDashboardController(favoritesRepo, logger)
 
-	awsIdcController := awsiamidc.NewAwsIdentityCenterController(sqlDb, favoritesRepo, vault, awssso.NewAwsSsoOidcClient(), timeProvider, logger)
+	awsIdcController := awsiamidc.NewAwsIdentityCenterController(db, favoritesRepo, vault, awssso.NewAwsSsoOidcClient(), timeProvider, logger)
 
 	appController := &AppController{
 		authController:      authController,

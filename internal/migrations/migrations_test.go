@@ -28,7 +28,7 @@ func TestNew(t *testing.T) {
 		MemFs: memFs,
 	}
 
-	runner, err := New(mockFs, "migrations", nil, zerolog.Logger{})
+	runner, err := NewMigrationRunner(mockFs, "migrations", nil, zerolog.Logger{})
 
 	require.NoError(t, err)
 	require.NotNil(t, runner)
@@ -39,7 +39,7 @@ func TestNewInvalidMigrationsPath(t *testing.T) {
 		MemFs: afero.NewMemMapFs(),
 	}
 
-	_, err := New(mockFs, "invalid-migrations-path", nil, zerolog.Logger{})
+	_, err := NewMigrationRunner(mockFs, "invalid-migrations-path", nil, zerolog.Logger{})
 
 	require.Error(t, err)
 }
@@ -59,7 +59,7 @@ func TestRunIfNecessary(t *testing.T) {
 	}
 
 	dataStore := datastore.New(dir, "test.db")
-	runner, err := New(mockFs, "/migrations", dataStore, zerolog.Logger{})
+	runner, err := NewMigrationRunner(mockFs, "/migrations", dataStore, zerolog.Logger{})
 
 	require.NoError(t, err)
 	require.NotNil(t, runner)
@@ -94,7 +94,7 @@ func TestRunIfNecessaryNoMigrationsNeeded(t *testing.T) {
 	}
 
 	dataStore := datastore.New(dir, "test.db")
-	runner, err := New(mockFs, "/migrations", dataStore, zerolog.Logger{})
+	runner, err := NewMigrationRunner(mockFs, "/migrations", dataStore, zerolog.Logger{})
 
 	require.NoError(t, err)
 	require.NotNil(t, runner)
@@ -118,7 +118,7 @@ func TestRunIfNecessaryFailedMigration(t *testing.T) {
 	}
 
 	dataStore := datastore.NewInMemory("test.db")
-	runner, err := New(mockFs, "/migrations", dataStore, zerolog.Logger{})
+	runner, err := NewMigrationRunner(mockFs, "/migrations", dataStore, zerolog.Logger{})
 
 	require.NoError(t, err)
 	require.NotNil(t, runner)
@@ -146,7 +146,7 @@ func TestRunIfNecessaryFailedMigrationRestoresDatabase(t *testing.T) {
 	require.Error(t, err)
 	db.Close()
 
-	runner, err := New(mockFs, "/migrations", dataStore, zerolog.Logger{})
+	runner, err := NewMigrationRunner(mockFs, "/migrations", dataStore, zerolog.Logger{})
 
 	require.NoError(t, err)
 	require.NotNil(t, runner)
@@ -172,7 +172,7 @@ func TestRunIfNecessaryFailedMigrationRestoresDatabase(t *testing.T) {
 		MemFs: memFs,
 	}
 
-	runner, err = New(mockFs, "/migrations", dataStore, zerolog.Logger{})
+	runner, err = NewMigrationRunner(mockFs, "/migrations", dataStore, zerolog.Logger{})
 	require.NoError(t, err)
 
 	err = runner.RunSafe()
