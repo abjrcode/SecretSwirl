@@ -38,7 +38,7 @@ func TestOpen(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, db)
-	require.FileExists(t, dataStore.dbFilePath)
+	require.FileExists(t, dataStore.GetDbFilePath())
 }
 
 func TestOpenInMemory(t *testing.T) {
@@ -52,7 +52,7 @@ func TestOpenInMemory(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, db)
-	require.Empty(t, dataStore.dbFilePath)
+	require.Empty(t, dataStore.GetDbFilePath())
 }
 
 func calculateFileHash(filePath string) (string, error) {
@@ -93,7 +93,7 @@ func TestTakeBackup(t *testing.T) {
 	seedDatabase(t, db)
 	db.Close()
 
-	originalHash, err := calculateFileHash(originalStore.dbFilePath)
+	originalHash, err := calculateFileHash(originalStore.GetDbFilePath())
 	require.NoError(t, err)
 
 	require.NotNil(t, db)
@@ -101,9 +101,9 @@ func TestTakeBackup(t *testing.T) {
 	err = originalStore.TakeBackup()
 
 	require.NoError(t, err)
-	require.FileExists(t, originalStore.dbFilePath+".bak")
+	require.FileExists(t, originalStore.GetDbFilePath()+".bak")
 
-	backupHash, err := calculateFileHash(originalStore.dbFilePath + ".bak")
+	backupHash, err := calculateFileHash(originalStore.GetDbFilePath() + ".bak")
 	require.NoError(t, err)
 
 	require.Equal(t, originalHash, backupHash)
@@ -124,8 +124,8 @@ func TestTakeBackupInMemory(t *testing.T) {
 	err := dataStore.TakeBackup()
 
 	require.NoError(t, err)
-	require.NoFileExists(t, dataStore.dbFilePath)
-	require.NoFileExists(t, dataStore.dbFilePath+".bak")
+	require.NoFileExists(t, dataStore.GetDbFilePath())
+	require.NoFileExists(t, dataStore.GetDbFilePath()+".bak")
 }
 
 func TestRestoreBackup(t *testing.T) {
@@ -136,7 +136,7 @@ func TestRestoreBackup(t *testing.T) {
 	db, err := originalStore.Open()
 	require.NoError(t, err)
 
-	originalHash, err := calculateFileHash(originalStore.dbFilePath)
+	originalHash, err := calculateFileHash(originalStore.GetDbFilePath())
 	require.NoError(t, err)
 
 	require.NotNil(t, db)
@@ -150,10 +150,10 @@ func TestRestoreBackup(t *testing.T) {
 	err = originalStore.RestoreBackup()
 	require.NoError(t, err)
 
-	require.FileExists(t, originalStore.dbFilePath)
-	require.FileExists(t, originalStore.dbFilePath+".bak")
+	require.FileExists(t, originalStore.GetDbFilePath())
+	require.FileExists(t, originalStore.GetDbFilePath()+".bak")
 
-	backupHash, err := calculateFileHash(originalStore.dbFilePath)
+	backupHash, err := calculateFileHash(originalStore.GetDbFilePath())
 	require.NoError(t, err)
 
 	require.Equal(t, originalHash, backupHash)
@@ -171,7 +171,7 @@ func TestRestoreBackup(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestRestoreBackupWithOpenConnections(t *testing.T) {
+func TestRestoreBackup_WithOpenConnections(t *testing.T) {
 	dir := t.TempDir()
 
 	dataStore := New(dir, "test.db")
@@ -183,7 +183,7 @@ func TestRestoreBackupWithOpenConnections(t *testing.T) {
 		db.Close()
 	})
 
-	originalHash, err := calculateFileHash(dataStore.dbFilePath)
+	originalHash, err := calculateFileHash(dataStore.GetDbFilePath())
 	require.NoError(t, err)
 
 	require.NotNil(t, db)
@@ -194,10 +194,10 @@ func TestRestoreBackupWithOpenConnections(t *testing.T) {
 	err = dataStore.RestoreBackup()
 	require.NoError(t, err)
 
-	require.FileExists(t, dataStore.dbFilePath)
-	require.FileExists(t, dataStore.dbFilePath+".bak")
+	require.FileExists(t, dataStore.GetDbFilePath())
+	require.FileExists(t, dataStore.GetDbFilePath()+".bak")
 
-	backupHash, err := calculateFileHash(dataStore.dbFilePath)
+	backupHash, err := calculateFileHash(dataStore.GetDbFilePath())
 	require.NoError(t, err)
 
 	require.Equal(t, originalHash, backupHash)
