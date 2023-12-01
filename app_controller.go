@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/abjrcode/swervo/internal/faults"
+	"github.com/abjrcode/swervo/internal/app"
+	"github.com/abjrcode/swervo/internal/utils"
 	awsiamidc "github.com/abjrcode/swervo/providers/aws_iam_idc"
 	"github.com/rs/zerolog"
 	"github.com/wailsapp/wails/v2/pkg/menu"
@@ -22,22 +23,22 @@ type AppController struct {
 	ctx          context.Context
 	mainMenu     *menu.Menu
 	logger       zerolog.Logger
-	errorHandler faults.ErrorHandler
+	errorHandler app.ErrorHandler
 
 	authController      *AuthController
 	dashboardController *DashboardController
 	awsIamIdcController *awsiamidc.AwsIdentityCenterController
 }
 
-func (app *AppController) Init(ctx context.Context, errorHandler faults.ErrorHandler) {
+func (c *AppController) Init(ctx context.Context, errorHandler app.ErrorHandler) {
 	appMenu := menu.NewMenu()
 
-	enrichedLogger := zerolog.Ctx(ctx).With().Str("component", "app_controller").Logger()
+	logger := zerolog.Ctx(ctx).With().Str("component", "app_controller").Logger()
 
-	app.ctx = ctx
-	app.logger = enrichedLogger
-	app.errorHandler = errorHandler
-	app.mainMenu = appMenu
+	c.ctx = ctx
+	c.logger = logger
+	c.errorHandler = errorHandler
+	c.mainMenu = appMenu
 
 	FileMenu := appMenu.AddSubmenu("File")
 	FileMenu.AddText("Quit", keys.CmdOrCtrl("q"), func(_ *menu.CallbackData) {
@@ -57,75 +58,94 @@ func (app *AppController) Init(ctx context.Context, errorHandler faults.ErrorHan
 	})
 }
 
-func (app *AppController) ShowErrorDialog(msg string) {
-	wailsRuntime.MessageDialog(app.ctx, wailsRuntime.MessageDialogOptions{
+func (c *AppController) ShowErrorDialog(msg string) {
+	wailsRuntime.MessageDialog(c.ctx, wailsRuntime.MessageDialogOptions{
 		Type:    wailsRuntime.ErrorDialog,
 		Title:   "Error",
 		Message: msg,
 	})
 }
 
-func (app *AppController) ShowWarningDialog(msg string) {
-	wailsRuntime.MessageDialog(app.ctx, wailsRuntime.MessageDialogOptions{
+func (c *AppController) ShowWarningDialog(msg string) {
+	wailsRuntime.MessageDialog(c.ctx, wailsRuntime.MessageDialogOptions{
 		Type:    wailsRuntime.WarningDialog,
 		Title:   "Warning",
 		Message: msg,
 	})
 }
 
-func (app *AppController) CatchUnhandledError(msg string) {
-	app.errorHandler.Catch(app.logger, errors.New(msg))
+func (c *AppController) CatchUnhandledError(msg string) {
+	reqId := utils.NewRequestId()
+
+	// TODO: replace this with the actual user id
+	userId := "root"
+
+	ctx := app.NewContext(c.ctx, userId, reqId, reqId, reqId)
+	c.errorHandler.Catch(ctx, c.logger, errors.New(msg))
 }
 
-func (app *AppController) RunAppCommand(command string, commandInput map[string]any) (any, error) {
-	app.logger.Trace().Msgf("running command: [%s]", command)
+func (c *AppController) RunAppCommand(command string, commandInput map[string]any) (any, error) {
+	c.logger.Trace().Msgf("running command: [%s]", command)
+
+	reqId := utils.NewRequestId()
+
+	// TODO: replace this with the actual user id
+	userId := "root"
+
+	appContext := app.NewContext(
+		c.ctx,
+		userId,
+		reqId,
+		reqId,
+		reqId,
+	)
 
 	var output any = nil
 	var err error = nil
 
 	switch command {
 	case "Auth_IsVaultConfigured":
-		output, err = app.authController.IsVaultConfigured(app.ctx)
+		output, err = c.authController.IsVaultConfigured(appContext)
 	case "Auth_ConfigureVault":
-		err = app.authController.ConfigureVault(
-			app.ctx,
+		err = c.authController.ConfigureVault(
+			appContext,
 			Auth_ConfigureVaultCommandInput{
 				Password: commandInput["password"].(string),
 			})
 	case "Auth_Unlock":
-		output, err = app.authController.UnlockVault(
-			app.ctx,
+		output, err = c.authController.UnlockVault(
+			appContext,
 			Auth_UnlockCommandInput{
 				Password: commandInput["password"].(string),
 			})
 	case "Auth_Lock":
-		app.authController.LockVault()
+		c.authController.LockVault()
 	case "Dashboard_ListProviders":
-		output = app.dashboardController.ListProviders()
+		output = c.dashboardController.ListProviders()
 	case "Dashboard_ListFavorites":
-		output, err = app.dashboardController.ListFavorites(app.ctx)
+		output, err = c.dashboardController.ListFavorites(appContext)
 	case "AwsIamIdc_ListInstances":
-		output, err = app.awsIamIdcController.ListInstances(app.ctx)
+		output, err = c.awsIamIdcController.ListInstances(appContext)
 	case "AwsIamIdc_GetInstanceData":
-		output, err = app.awsIamIdcController.GetInstanceData(app.ctx,
+		output, err = c.awsIamIdcController.GetInstanceData(appContext,
 			commandInput["instanceId"].(string),
 			commandInput["forceRefresh"].(bool))
 	case "AwsIamIdc_GetRoleCredentials":
-		output, err = app.awsIamIdcController.GetRoleCredentials(app.ctx,
+		output, err = c.awsIamIdcController.GetRoleCredentials(appContext,
 			awsiamidc.AwsIamIdc_GetRoleCredentialsCommandInput{
 				InstanceId: commandInput["instanceId"].(string),
 				AccountId:  commandInput["accountId"].(string),
 				RoleName:   commandInput["roleName"].(string),
 			})
 	case "AwsIamIdc_Setup":
-		output, err = app.awsIamIdcController.Setup(app.ctx,
+		output, err = c.awsIamIdcController.Setup(appContext,
 			awsiamidc.AwsIamIdc_SetupCommandInput{
 				StartUrl:  commandInput["startUrl"].(string),
 				AwsRegion: commandInput["awsRegion"].(string),
 				Label:     commandInput["label"].(string),
 			})
 	case "AwsIamIdc_FinalizeSetup":
-		output, err = app.awsIamIdcController.FinalizeSetup(app.ctx,
+		output, err = c.awsIamIdcController.FinalizeSetup(appContext,
 			awsiamidc.AwsIamIdc_FinalizeSetupCommandInput{
 				ClientId:   commandInput["clientId"].(string),
 				StartUrl:   commandInput["startUrl"].(string),
@@ -135,13 +155,13 @@ func (app *AppController) RunAppCommand(command string, commandInput map[string]
 				DeviceCode: commandInput["deviceCode"].(string),
 			})
 	case "AwsIamIdc_MarkAsFavorite":
-		err = app.awsIamIdcController.MarkAsFavorite(app.ctx, commandInput["instanceId"].(string))
+		err = c.awsIamIdcController.MarkAsFavorite(appContext, commandInput["instanceId"].(string))
 	case "AwsIamIdc_UnmarkAsFavorite":
-		err = app.awsIamIdcController.UnmarkAsFavorite(app.ctx, commandInput["instanceId"].(string))
+		err = c.awsIamIdcController.UnmarkAsFavorite(appContext, commandInput["instanceId"].(string))
 	case "AwsIamIdc_RefreshAccessToken":
-		output, err = app.awsIamIdcController.RefreshAccessToken(app.ctx, commandInput["instanceId"].(string))
+		output, err = c.awsIamIdcController.RefreshAccessToken(appContext, commandInput["instanceId"].(string))
 	case "AwsIamIdc_FinalizeRefreshAccessToken":
-		err = app.awsIamIdcController.FinalizeRefreshAccessToken(app.ctx,
+		err = c.awsIamIdcController.FinalizeRefreshAccessToken(appContext,
 			awsiamidc.AwsIamIdc_FinalizeRefreshAccessTokenCommandInput{
 				InstanceId: commandInput["instanceId"].(string),
 				Region:     commandInput["region"].(string),
@@ -149,11 +169,11 @@ func (app *AppController) RunAppCommand(command string, commandInput map[string]
 				DeviceCode: commandInput["deviceCode"].(string),
 			})
 	default:
-		output, err = nil, errors.Join(ErrInvalidAppCommand, faults.ErrFatal)
+		output, err = nil, errors.Join(ErrInvalidAppCommand, app.ErrFatal)
 	}
 
-	if errors.Is(err, faults.ErrFatal) {
-		app.errorHandler.Catch(app.logger, err)
+	if errors.Is(err, app.ErrFatal) {
+		c.errorHandler.Catch(appContext, c.logger, err)
 	}
 
 	return output, err

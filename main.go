@@ -11,10 +11,8 @@ import (
 
 	"github.com/abjrcode/swervo/clients/awssso"
 	"github.com/abjrcode/swervo/favorites"
-	"github.com/abjrcode/swervo/internal/config"
+	"github.com/abjrcode/swervo/internal/app"
 	"github.com/abjrcode/swervo/internal/datastore"
-	"github.com/abjrcode/swervo/internal/faults"
-	"github.com/abjrcode/swervo/internal/logging"
 	"github.com/abjrcode/swervo/internal/migrations"
 	"github.com/abjrcode/swervo/internal/security/vault"
 	"github.com/abjrcode/swervo/internal/utils"
@@ -37,7 +35,7 @@ var CommitSha string = "HEAD"
 var BuildLink string = "http://localhost"
 
 func main() {
-	generateBindingsRun := config.IsWailsRunningAppToGenerateBindings(os.Args)
+	generateBindingsRun := app.IsWailsRunningAppToGenerateBindings(os.Args)
 
 	pwd, err := os.Executable()
 
@@ -45,7 +43,7 @@ func main() {
 		log.Fatalf("failed to determine current working directory: [%s]", err)
 	}
 
-	appDataDir, appDataDirErr := config.GetAppDataDir(pwd, BuildType == "debug")
+	appDataDir, appDataDirErr := app.GetAppDataDir(pwd, BuildType == "debug")
 
 	if appDataDirErr != nil {
 		log.Fatalf("failed to determine app data directory: [%s]", appDataDir)
@@ -54,9 +52,9 @@ func main() {
 	var logFile = io.Discard
 
 	if !generateBindingsRun {
-		config.InitializeAppDataDir(appDataDir)
+		app.InitializeAppDataDir(appDataDir)
 
-		file, logFileErr := logging.InitLogFile(appDataDir, "swervo_log.json")
+		file, logFileErr := app.InitLogFile(appDataDir, "swervo_log.json")
 
 		if logFileErr != nil {
 			log.Fatalf("failed to initialize log file: [%s]", logFileErr)
@@ -67,9 +65,9 @@ func main() {
 		defer file.Close()
 	}
 
-	logger := logging.InitLogger(logFile, Version, CommitSha)
+	logger := app.InitLogger(logFile, Version, CommitSha)
 
-	errorHandler := faults.NewErrorHandler()
+	errorHandler := app.NewErrorHandler()
 
 	logger.Info().Msgf("Swervo version: %s, commit SHA: %s", Version, CommitSha)
 	logger.Info().Msgf("app data directory: [%s]", appDataDir)
@@ -80,15 +78,15 @@ func main() {
 	if !generateBindingsRun {
 		db, err = dataStore.Open()
 		if err != nil {
-			errorHandler.CatchWithMsg(logger, err, "failed to open database")
+			errorHandler.CatchWithMsg(nil, logger, err, "failed to open database")
 		}
 		defer dataStore.Close(db)
 		migrationRunner, err := migrations.NewMigrationRunner(migrations.DefaultMigrationsFs, "scripts", dataStore, logger)
 
-		errorHandler.CatchWithMsg(logger, err, "could not read migrations from embedded filesystem")
+		errorHandler.CatchWithMsg(nil, logger, err, "could not read migrations from embedded filesystem")
 
 		if err := migrationRunner.RunSafe(); err != nil {
-			errorHandler.CatchWithMsg(logger, err, "error when running migrations")
+			errorHandler.CatchWithMsg(nil, logger, err, "error when running migrations")
 		}
 
 	}
@@ -119,10 +117,8 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		Logger: logging.NewWailsLoggerAdapter(&logger),
+		Logger: app.NewWailsLoggerAdapter(&logger),
 		OnStartup: func(ctx context.Context) {
-			errorHandler.InitWailsContext(&ctx)
-
 			appController.Init(logger.WithContext(ctx), errorHandler)
 		},
 		Bind: []interface{}{
@@ -132,6 +128,6 @@ func main() {
 			awsIdcController,
 		},
 	}); err != nil {
-		errorHandler.Catch(logger, errors.New("failed to launch Swervo"))
+		errorHandler.Catch(nil, logger, errors.New("failed to launch Swervo"))
 	}
 }

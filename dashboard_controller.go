@@ -1,11 +1,10 @@
 package main
 
 import (
-	"context"
 	"errors"
 
 	"github.com/abjrcode/swervo/favorites"
-	"github.com/abjrcode/swervo/internal/faults"
+	"github.com/abjrcode/swervo/internal/app"
 	"github.com/abjrcode/swervo/providers"
 	"github.com/rs/zerolog"
 )
@@ -45,11 +44,11 @@ func NewDashboardController(favoritesRepo favorites.FavoritesRepo, logger zerolo
 	}
 }
 
-func (c *DashboardController) ListFavorites(ctx context.Context) ([]FavoriteInstance, error) {
+func (c *DashboardController) ListFavorites(ctx app.Context) ([]FavoriteInstance, error) {
 	favorites, err := c.favoritesRepo.ListAll(ctx)
 
 	if err != nil {
-		return nil, errors.Join(err, faults.ErrFatal)
+		return nil, errors.Join(err, app.ErrFatal)
 	}
 
 	favoriteInstances := make([]FavoriteInstance, 0, len(favorites))

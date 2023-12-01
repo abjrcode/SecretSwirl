@@ -10,6 +10,7 @@ require (
 	github.com/coocood/freecache v1.2.4
 	github.com/dustin/go-humanize v1.0.1
 	github.com/magefile/mage v1.15.0
+	github.com/rs/xid v1.5.0
 	github.com/rs/zerolog v1.31.0
 	github.com/segmentio/ksuid v1.0.4
 	github.com/spf13/afero v1.10.0
