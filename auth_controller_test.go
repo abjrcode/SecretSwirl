@@ -6,7 +6,6 @@ import (
 	"github.com/abjrcode/swervo/internal/migrations"
 	"github.com/abjrcode/swervo/internal/security/vault"
 	"github.com/abjrcode/swervo/internal/testhelpers"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -14,12 +13,11 @@ func initAuthController(t *testing.T) (*AuthController, *testhelpers.MockClock) 
 	db, err := migrations.NewInMemoryMigratedDatabase(t, "auth-controller-tests.db")
 	require.NoError(t, err)
 
-	logger := zerolog.Nop()
 	mockClock := testhelpers.NewMockClock()
 
-	vault := vault.NewVault(db, mockClock, logger)
+	vault := vault.NewVault(db, mockClock)
 
-	controller := NewAuthController(vault, logger)
+	controller := NewAuthController(vault)
 
 	return controller, mockClock
 }

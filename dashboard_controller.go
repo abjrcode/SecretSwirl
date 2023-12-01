@@ -6,11 +6,9 @@ import (
 	"github.com/abjrcode/swervo/favorites"
 	"github.com/abjrcode/swervo/internal/app"
 	"github.com/abjrcode/swervo/providers"
-	"github.com/rs/zerolog"
 )
 
 type DashboardController struct {
-	logger        zerolog.Logger
 	favoritesRepo favorites.FavoritesRepo
 }
 
@@ -27,7 +25,7 @@ type FavoriteInstance struct {
 
 var supportedProviders []Provider
 
-func NewDashboardController(favoritesRepo favorites.FavoritesRepo, logger zerolog.Logger) *DashboardController {
+func NewDashboardController(favoritesRepo favorites.FavoritesRepo) *DashboardController {
 	supportedProviders = make([]Provider, 0, len(providers.SupportedProviders))
 	for _, provider := range providers.SupportedProviders {
 		supportedProviders = append(supportedProviders, Provider{
@@ -36,11 +34,8 @@ func NewDashboardController(favoritesRepo favorites.FavoritesRepo, logger zerolo
 		})
 	}
 
-	enrichedLogger := logger.With().Str("component", "dashboard_controller").Logger()
-
 	return &DashboardController{
 		favoritesRepo: favoritesRepo,
-		logger:        enrichedLogger,
 	}
 }
 

@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"github.com/abjrcode/swervo/internal/app"
-	"github.com/rs/zerolog"
 )
 
 type Favorite struct {
@@ -21,16 +20,13 @@ type FavoritesRepo interface {
 }
 
 type favoritesImpl struct {
-	logger zerolog.Logger
-	db     *sql.DB
+	db *sql.DB
 }
 
-func NewFavorites(db *sql.DB, logger zerolog.Logger) FavoritesRepo {
-	enrichedLogger := logger.With().Str("component", "favorites_repo").Logger()
+func NewFavorites(db *sql.DB) FavoritesRepo {
 
 	return &favoritesImpl{
-		db:     db,
-		logger: enrichedLogger,
+		db: db,
 	}
 }
 

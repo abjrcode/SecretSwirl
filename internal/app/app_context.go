@@ -1,9 +1,16 @@
 package app
 
-import "context"
+import (
+	"context"
+
+	"github.com/rs/zerolog"
+)
 
 type Context interface {
 	context.Context
+
+	Logger() *zerolog.Logger
+
 	UserId() string
 	RequestId() string
 	CausationId() string
@@ -12,31 +19,37 @@ type Context interface {
 
 type appContext struct {
 	context.Context
+	logger        *zerolog.Logger
 	userId        string
 	requestId     string
 	causationId   string
 	correlationId string
 }
 
-func (c *appContext) UserId() string {
-	return c.userId
+func (appCtx *appContext) Logger() *zerolog.Logger {
+	return appCtx.logger
 }
 
-func (c *appContext) RequestId() string {
-	return c.requestId
+func (appCtx *appContext) UserId() string {
+	return appCtx.userId
 }
 
-func (c *appContext) CausationId() string {
-	return c.causationId
+func (appCtx *appContext) RequestId() string {
+	return appCtx.requestId
 }
 
-func (c *appContext) CorrelationId() string {
-	return c.correlationId
+func (appCtx *appContext) CausationId() string {
+	return appCtx.causationId
 }
 
-func NewContext(ctx context.Context, userId string, requestId string, causationId string, correlationId string) Context {
+func (appCtx *appContext) CorrelationId() string {
+	return appCtx.correlationId
+}
+
+func NewContext(ctx context.Context, userId string, requestId string, causationId string, correlationId string, logger *zerolog.Logger) Context {
 	return &appContext{
 		Context:       ctx,
+		logger:        logger,
 		userId:        userId,
 		requestId:     requestId,
 		causationId:   causationId,

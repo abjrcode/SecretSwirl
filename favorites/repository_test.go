@@ -6,7 +6,6 @@ import (
 	"github.com/abjrcode/swervo/internal/migrations"
 	"github.com/abjrcode/swervo/internal/testhelpers"
 	"github.com/abjrcode/swervo/providers"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -14,8 +13,7 @@ func TestAddFavorite(t *testing.T) {
 	db, err := migrations.NewInMemoryMigratedDatabase(t, "favorites-repo-tests.db")
 	require.NoError(t, err)
 
-	logger := zerolog.Nop()
-	repo := NewFavorites(db, logger)
+	repo := NewFavorites(db)
 
 	favorite := &Favorite{
 		ProviderCode: providers.AwsIamIdc,
@@ -37,9 +35,7 @@ func TestRemoveFavorite(t *testing.T) {
 	db, err := migrations.NewInMemoryMigratedDatabase(t, "favorites-repo-tests.db")
 	require.NoError(t, err)
 
-	logger := zerolog.Nop()
-
-	repo := NewFavorites(db, logger)
+	repo := NewFavorites(db)
 	ctx := testhelpers.NewMockAppContext()
 
 	favorite := &Favorite{
@@ -69,9 +65,7 @@ func TestIsFavorite(t *testing.T) {
 	db, err := migrations.NewInMemoryMigratedDatabase(t, "favorites-repo-tests.db")
 	require.NoError(t, err)
 
-	logger := zerolog.Nop()
-
-	repo := NewFavorites(db, logger)
+	repo := NewFavorites(db)
 	ctx := testhelpers.NewMockAppContext()
 
 	favorite := &Favorite{

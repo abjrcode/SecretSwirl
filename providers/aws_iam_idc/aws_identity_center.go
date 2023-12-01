@@ -17,7 +17,6 @@ import (
 	"github.com/abjrcode/swervo/providers"
 	"github.com/coocood/freecache"
 	"github.com/dustin/go-humanize"
-	"github.com/rs/zerolog"
 	"github.com/segmentio/ksuid"
 )
 
@@ -33,7 +32,6 @@ var (
 )
 
 type AwsIdentityCenterController struct {
-	logger            zerolog.Logger
 	db                *sql.DB
 	favoritesRepo     favorites.FavoritesRepo
 	encryptionService encryption.EncryptionService
@@ -42,14 +40,11 @@ type AwsIdentityCenterController struct {
 	cache             *freecache.Cache
 }
 
-func NewAwsIdentityCenterController(db *sql.DB, favoritesRepo favorites.FavoritesRepo, encryptionService encryption.EncryptionService, awsSsoClient awssso.AwsSsoOidcClient, datetime utils.Clock, logger zerolog.Logger) *AwsIdentityCenterController {
+func NewAwsIdentityCenterController(db *sql.DB, favoritesRepo favorites.FavoritesRepo, encryptionService encryption.EncryptionService, awsSsoClient awssso.AwsSsoOidcClient, datetime utils.Clock) *AwsIdentityCenterController {
 	fiveHundredTwelveKilobytes := 512 * 1024
 	cache := freecache.NewCache(fiveHundredTwelveKilobytes)
 
-	logger = logger.With().Str("component", "aws_idc_controller").Logger()
-
 	return &AwsIdentityCenterController{
-		logger:            logger,
 		db:                db,
 		favoritesRepo:     favoritesRepo,
 		encryptionService: encryptionService,
@@ -141,7 +136,7 @@ func (c *AwsIdentityCenterController) GetInstanceData(ctx app.Context, instanceI
 
 	now := c.timeHelper.NowUnix()
 	if now > accessTokenCreatedAt+accessTokenExpiresIn {
-		c.logger.Info().Msgf("token for instance [%s] has expired", instanceId)
+		ctx.Logger().Info().Msgf("token for instance [%s] has expired", instanceId)
 
 		return &AwsIdentityCenterCardData{
 			Enabled:              true,
@@ -158,7 +153,7 @@ func (c *AwsIdentityCenterController) GetInstanceData(ctx app.Context, instanceI
 		got, err := c.cache.Get([]byte(instanceId))
 
 		if err == nil {
-			c.logger.Info().Msgf("cache hit for instance [%s]", instanceId)
+			ctx.Logger().Info().Msgf("cache hit for instance [%s]", instanceId)
 
 			var accounts []AwsIdentityCenterAccount
 			buffer := bytes.NewBuffer(got)
@@ -166,7 +161,7 @@ func (c *AwsIdentityCenterController) GetInstanceData(ctx app.Context, instanceI
 			err = gob.NewDecoder(buffer).Decode(&accounts)
 
 			if err != nil {
-				c.logger.Error().Err(err).Msg("failed to decode accounts from cache")
+				ctx.Logger().Error().Err(err).Msg("failed to decode accounts from cache")
 				return nil, errors.Join(err, app.ErrFatal)
 			}
 
@@ -188,11 +183,11 @@ func (c *AwsIdentityCenterController) GetInstanceData(ctx app.Context, instanceI
 		return nil, errors.Join(err, app.ErrFatal)
 	}
 
-	c.logger.Debug().Msgf("fetching accounts for instance [%s] with refresh=%t", instanceId, forceRefresh)
+	ctx.Logger().Debug().Msgf("fetching accounts for instance [%s] with refresh=%t", instanceId, forceRefresh)
 	accountsOut, err := c.awsSsoClient.ListAccounts(ctx, awssso.AwsRegion(region), accessToken)
 
 	if err != nil {
-		c.logger.Error().Err(err).Msg("aws sso client failed to list accounts")
+		ctx.Logger().Error().Err(err).Msg("aws sso client failed to list accounts")
 
 		return nil, ErrTransientAwsClientError
 	}
@@ -202,7 +197,7 @@ func (c *AwsIdentityCenterController) GetInstanceData(ctx app.Context, instanceI
 	err = gob.NewEncoder(buffer).Encode(accountsOut.Accounts)
 
 	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to encode accounts to cache")
+		ctx.Logger().Error().Err(err).Msg("failed to encode accounts to cache")
 		return nil, errors.Join(err, app.ErrFatal)
 	}
 
@@ -270,7 +265,7 @@ func (c *AwsIdentityCenterController) GetRoleCredentials(ctx app.Context, input 
 	res, err := c.awsSsoClient.GetRoleCredentials(ctx, awssso.AwsRegion(region), input.AccountId, input.RoleName, accessToken)
 
 	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to get role credentials")
+		ctx.Logger().Error().Err(err).Msg("failed to get role credentials")
 		return nil, errors.Join(err, app.ErrFatal)
 	}
 
@@ -351,19 +346,19 @@ func (c *AwsIdentityCenterController) Setup(ctx app.Context, input AwsIamIdc_Set
 	}
 
 	if exists {
-		c.logger.Warn().Msgf("instance [%s] already exists", startUrl)
+		ctx.Logger().Warn().Msgf("instance [%s] already exists", startUrl)
 		return nil, ErrInstanceAlreadyRegistered
 	}
 
 	if len(label) < 1 || len(label) > 50 {
-		c.logger.Debug().Msgf("invalid label [%s]", label)
+		ctx.Logger().Debug().Msgf("invalid label [%s]", label)
 		return nil, ErrInvalidLabel
 	}
 
 	regRes, err := c.getOrRegisterClient(ctx, awsRegion)
 
 	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to get or register client")
+		ctx.Logger().Error().Err(err).Msg("failed to get or register client")
 		return nil, ErrTransientAwsClientError
 	}
 
@@ -371,11 +366,11 @@ func (c *AwsIdentityCenterController) Setup(ctx app.Context, input AwsIamIdc_Set
 
 	if err != nil {
 		if errors.Is(err, awssso.ErrInvalidRequest) {
-			c.logger.Debug().Err(err).Msg("failed to authorize device because start URL is invalid")
+			ctx.Logger().Debug().Err(err).Msg("failed to authorize device because start URL is invalid")
 			return nil, ErrInvalidStartUrl
 		}
 
-		c.logger.Error().Err(err).Msg("failed to authorize device")
+		ctx.Logger().Error().Err(err).Msg("failed to authorize device")
 		return nil, ErrTransientAwsClientError
 	}
 
@@ -432,16 +427,16 @@ func (c *AwsIdentityCenterController) FinalizeSetup(ctx app.Context, input AwsIa
 
 	if err != nil {
 		if errors.Is(err, awssso.ErrDeviceFlowNotAuthorized) {
-			c.logger.Debug().Err(err).Msg("failed to get token because user did not authorize device")
+			ctx.Logger().Debug().Err(err).Msg("failed to get token because user did not authorize device")
 			return "", ErrDeviceAuthFlowNotAuthorized
 		}
 
 		if errors.Is(err, awssso.ErrDeviceCodeExpired) {
-			c.logger.Debug().Err(err).Msg("failed to get token because user and device code expired")
+			ctx.Logger().Debug().Err(err).Msg("failed to get token because user and device code expired")
 			return "", ErrDeviceAuthFlowTimedOut
 		}
 
-		c.logger.Error().Err(err).Msg("failed to get token")
+		ctx.Logger().Error().Err(err).Msg("failed to get token")
 		return "", ErrTransientAwsClientError
 	}
 
@@ -513,11 +508,12 @@ func (c *AwsIdentityCenterController) RefreshAccessToken(ctx app.Context, instan
 	var startUrl string
 	var awsRegion string
 	var label string
+
 	row := c.db.QueryRowContext(ctx, "SELECT start_url, region, label FROM aws_iam_idc_instances WHERE instance_id = ?", instanceId)
 
 	if err := row.Scan(&startUrl, &awsRegion, &label); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			c.logger.Debug().Msgf("instance [%s] was not found", instanceId)
+			ctx.Logger().Debug().Msgf("instance [%s] was not found", instanceId)
 			return nil, ErrInstanceWasNotFound
 		}
 	}
@@ -525,14 +521,14 @@ func (c *AwsIdentityCenterController) RefreshAccessToken(ctx app.Context, instan
 	regRes, err := c.getOrRegisterClient(ctx, awsRegion)
 
 	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to get or register client")
+		ctx.Logger().Error().Err(err).Msg("failed to get or register client")
 		return nil, ErrTransientAwsClientError
 	}
 
 	authorizeRes, err := c.authorizeDevice(ctx, startUrl, awsRegion, regRes.ClientId, regRes.ClientSecret)
 
 	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to authorize device")
+		ctx.Logger().Error().Err(err).Msg("failed to authorize device")
 		return nil, ErrTransientAwsClientError
 	}
 
@@ -581,16 +577,16 @@ func (c *AwsIdentityCenterController) FinalizeRefreshAccessToken(ctx app.Context
 
 	if err != nil {
 		if errors.Is(err, awssso.ErrDeviceFlowNotAuthorized) {
-			c.logger.Debug().Err(err).Msg("failed to get token because user did not authorize device")
+			ctx.Logger().Debug().Err(err).Msg("failed to get token because user did not authorize device")
 			return ErrDeviceAuthFlowNotAuthorized
 		}
 
 		if errors.Is(err, awssso.ErrDeviceCodeExpired) {
-			c.logger.Debug().Err(err).Msg("failed to get token because user and device code expired")
+			ctx.Logger().Debug().Err(err).Msg("failed to get token because user and device code expired")
 			return ErrDeviceAuthFlowTimedOut
 		}
 
-		c.logger.Error().Err(err).Msg("failed to get token")
+		ctx.Logger().Error().Err(err).Msg("failed to get token")
 		return ErrTransientAwsClientError
 	}
 
@@ -612,7 +608,7 @@ func (c *AwsIdentityCenterController) FinalizeRefreshAccessToken(ctx app.Context
 		return errors.Join(err, app.ErrFatal)
 	}
 
-	c.logger.Info().Msgf("refreshing access token for instance [%s]", input.InstanceId)
+	ctx.Logger().Info().Msgf("refreshing access token for instance [%s]", input.InstanceId)
 
 	sql := `UPDATE aws_iam_idc_instances SET
 		id_token_enc = ?,
@@ -671,11 +667,11 @@ func (c *AwsIdentityCenterController) getOrRegisterClient(ctx app.Context, awsRe
 
 	if shouldRegisterClient {
 		friendlyClientName := fmt.Sprintf("swervo_%s", utils.RandomString(6))
-		c.logger.Info().Msgf("registering new client [%s]", friendlyClientName)
+		ctx.Logger().Info().Msgf("registering new client [%s]", friendlyClientName)
 
 		output, err := c.awsSsoClient.RegisterClient(ctx, awssso.AwsRegion(awsRegion), friendlyClientName)
 		if err != nil {
-			c.logger.Error().Err(err).Msg("failed to register client")
+			ctx.Logger().Error().Err(err).Msg("failed to register client")
 			return nil, err
 		}
 
@@ -694,20 +690,20 @@ func (c *AwsIdentityCenterController) getOrRegisterClient(ctx app.Context, awsRe
 			return nil, errors.Join(err, app.ErrFatal)
 		}
 
-		c.logger.Info().Msgf("client [%s] registered successfully", friendlyClientName)
+		ctx.Logger().Info().Msgf("client [%s] registered successfully", friendlyClientName)
 
 		return output, nil
 	}
 
 	if c.timeHelper.NowUnix() > result.ExpiresAt {
-		c.logger.Info().Msg("client expired. registering new client")
+		ctx.Logger().Info().Msg("client expired. registering new client")
 
 		friendlyClientName := fmt.Sprintf("swervo_%s", utils.RandomString(6))
-		c.logger.Info().Msgf("registering new client [%s]", friendlyClientName)
+		ctx.Logger().Info().Msgf("registering new client [%s]", friendlyClientName)
 
 		output, err := c.awsSsoClient.RegisterClient(ctx, awssso.AwsRegion(awsRegion), friendlyClientName)
 		if err != nil {
-			c.logger.Error().Err(err).Msg("failed to register client")
+			ctx.Logger().Error().Err(err).Msg("failed to register client")
 			return nil, err
 		}
 
@@ -730,7 +726,7 @@ func (c *AwsIdentityCenterController) getOrRegisterClient(ctx app.Context, awsRe
 			return nil, errors.Join(err, app.ErrFatal)
 		}
 
-		c.logger.Info().Msgf("client [%s] registered successfully", friendlyClientName)
+		ctx.Logger().Info().Msgf("client [%s] registered successfully", friendlyClientName)
 
 		return output, nil
 	}
@@ -746,7 +742,7 @@ func (c *AwsIdentityCenterController) getOrRegisterClient(ctx app.Context, awsRe
 }
 
 func (c *AwsIdentityCenterController) authorizeDevice(ctx app.Context, startUrl, region string, clientId, clientSecret string) (*awssso.AuthorizationResponse, error) {
-	c.logger.Info().Msg("Authorizing Device")
+	ctx.Logger().Info().Msg("Authorizing Device")
 
 	output, err := c.awsSsoClient.StartDeviceAuthorization(ctx, awssso.AwsRegion(region), startUrl, clientId, clientSecret)
 
@@ -754,13 +750,13 @@ func (c *AwsIdentityCenterController) authorizeDevice(ctx app.Context, startUrl,
 		return nil, err
 	}
 
-	c.logger.Info().Msgf("please login at %s?user_code=%s. You have %d seconds to do so", output.VerificationUri, output.UserCode, output.ExpiresIn)
+	ctx.Logger().Info().Msgf("please login at %s?user_code=%s. You have %d seconds to do so", output.VerificationUri, output.UserCode, output.ExpiresIn)
 
 	return output, nil
 }
 
 func (c *AwsIdentityCenterController) getToken(ctx app.Context, awsRegion, clientId, clientSecret, deviceCode, userCode string) (*awssso.GetTokenResponse, error) {
-	c.logger.Info().Msg("getting access token")
+	ctx.Logger().Info().Msg("getting access token")
 	output, err := c.awsSsoClient.CreateToken(ctx,
 		awssso.AwsRegion(awsRegion),
 		clientId,
@@ -770,11 +766,11 @@ func (c *AwsIdentityCenterController) getToken(ctx app.Context, awsRegion, clien
 	)
 
 	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to get access token")
+		ctx.Logger().Error().Err(err).Msg("failed to get access token")
 		return nil, err
 	}
 
-	c.logger.Info().Msg("got access token")
+	ctx.Logger().Info().Msg("got access token")
 
 	return output, nil
 }
