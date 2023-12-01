@@ -190,8 +190,7 @@ func (c *AwsIdentityCenterController) GetInstanceData(ctx context.Context, insta
 	}
 
 	c.logger.Debug().Msgf("fetching accounts for instance [%s] with refresh=%t", instanceId, forceRefresh)
-	awsContext := context.WithValue(ctx, awssso.AwsRegion("awsRegion"), region)
-	accountsOut, err := c.awsSsoClient.ListAccounts(awsContext, accessToken)
+	accountsOut, err := c.awsSsoClient.ListAccounts(ctx, awssso.AwsRegion(region), accessToken)
 
 	if err != nil {
 		c.logger.Error().Err(err).Msg("aws sso client failed to list accounts")
@@ -269,8 +268,7 @@ func (c *AwsIdentityCenterController) GetRoleCredentials(ctx context.Context, in
 		return nil, errors.Join(errors.New("failed to decrypt access token"), err, faults.ErrFatal)
 	}
 
-	awsContext := context.WithValue(ctx, awssso.AwsRegion("awsRegion"), region)
-	res, err := c.awsSsoClient.GetRoleCredentials(awsContext, input.AccountId, input.RoleName, accessToken)
+	res, err := c.awsSsoClient.GetRoleCredentials(ctx, awssso.AwsRegion(region), input.AccountId, input.RoleName, accessToken)
 
 	if err != nil {
 		c.logger.Error().Err(err).Msg("failed to get role credentials")
@@ -676,8 +674,7 @@ func (c *AwsIdentityCenterController) getOrRegisterClient(ctx context.Context, a
 		friendlyClientName := fmt.Sprintf("swervo_%s", utils.RandomString(6))
 		c.logger.Info().Msgf("registering new client [%s]", friendlyClientName)
 
-		awsContext := context.WithValue(ctx, awssso.AwsRegion("awsRegion"), awsRegion)
-		output, err := c.awsSsoClient.RegisterClient(awsContext, friendlyClientName)
+		output, err := c.awsSsoClient.RegisterClient(ctx, awssso.AwsRegion(awsRegion), friendlyClientName)
 		if err != nil {
 			c.logger.Error().Err(err).Msg("failed to register client")
 			return nil, err
@@ -709,7 +706,7 @@ func (c *AwsIdentityCenterController) getOrRegisterClient(ctx context.Context, a
 		friendlyClientName := fmt.Sprintf("swervo_%s", utils.RandomString(6))
 		c.logger.Info().Msgf("registering new client [%s]", friendlyClientName)
 
-		output, err := c.awsSsoClient.RegisterClient(ctx, friendlyClientName)
+		output, err := c.awsSsoClient.RegisterClient(ctx, awssso.AwsRegion(awsRegion), friendlyClientName)
 		if err != nil {
 			c.logger.Error().Err(err).Msg("failed to register client")
 			return nil, err
@@ -751,8 +748,8 @@ func (c *AwsIdentityCenterController) getOrRegisterClient(ctx context.Context, a
 
 func (c *AwsIdentityCenterController) authorizeDevice(ctx context.Context, startUrl, region string, clientId, clientSecret string) (*awssso.AuthorizationResponse, error) {
 	c.logger.Info().Msg("Authorizing Device")
-	awsContext := context.WithValue(ctx, awssso.AwsRegion("awsRegion"), region)
-	output, err := c.awsSsoClient.StartDeviceAuthorization(awsContext, startUrl, clientId, clientSecret)
+
+	output, err := c.awsSsoClient.StartDeviceAuthorization(ctx, awssso.AwsRegion(region), startUrl, clientId, clientSecret)
 
 	if err != nil {
 		return nil, err
@@ -764,10 +761,9 @@ func (c *AwsIdentityCenterController) authorizeDevice(ctx context.Context, start
 }
 
 func (c *AwsIdentityCenterController) getToken(ctx context.Context, awsRegion, clientId, clientSecret, deviceCode, userCode string) (*awssso.GetTokenResponse, error) {
-	awsContext := context.WithValue(ctx, awssso.AwsRegion("awsRegion"), awsRegion)
-
 	c.logger.Info().Msg("getting access token")
-	output, err := c.awsSsoClient.CreateToken(awsContext,
+	output, err := c.awsSsoClient.CreateToken(ctx,
+		awssso.AwsRegion(awsRegion),
 		clientId,
 		clientSecret,
 		userCode,
