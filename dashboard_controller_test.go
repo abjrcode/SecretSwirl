@@ -6,7 +6,6 @@ import (
 	"github.com/abjrcode/swervo/favorites"
 	"github.com/abjrcode/swervo/internal/migrations"
 	"github.com/abjrcode/swervo/internal/testhelpers"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -14,12 +13,10 @@ func initDashboardController(t *testing.T) *DashboardController {
 	db, err := migrations.NewInMemoryMigratedDatabase(t, "dashboard-controller-tests.db")
 	require.NoError(t, err)
 
-	logger := zerolog.Nop()
-	favoritesRepo := favorites.NewFavorites(db, logger)
+	favoritesRepo := favorites.NewFavorites(db)
 
 	controller := &DashboardController{
 		favoritesRepo: favoritesRepo,
-		logger:        logger,
 	}
 
 	return controller

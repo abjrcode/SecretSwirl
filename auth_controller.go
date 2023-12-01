@@ -14,12 +14,9 @@ type AuthController struct {
 	vault vault.Vault
 }
 
-func NewAuthController(vault vault.Vault, logger zerolog.Logger) *AuthController {
-	logger = logger.With().Str("component", "auth_controller").Logger()
-
+func NewAuthController(vault vault.Vault) *AuthController {
 	return &AuthController{
-		vault:  vault,
-		logger: logger,
+		vault: vault,
 	}
 }
 

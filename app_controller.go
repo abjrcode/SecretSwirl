@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"strings"
 
 	"github.com/abjrcode/swervo/internal/app"
 	"github.com/abjrcode/swervo/internal/utils"
@@ -77,27 +78,34 @@ func (c *AppController) ShowWarningDialog(msg string) {
 func (c *AppController) CatchUnhandledError(msg string) {
 	reqId := utils.NewRequestId()
 
-	// TODO: replace this with the actual user id
 	userId := "root"
 
-	ctx := app.NewContext(c.ctx, userId, reqId, reqId, reqId)
+	ctx := app.NewContext(c.ctx, userId, reqId, reqId, reqId, &c.logger)
 	c.errorHandler.Catch(ctx, c.logger, errors.New(msg))
 }
 
 func (c *AppController) RunAppCommand(command string, commandInput map[string]any) (any, error) {
-	c.logger.Trace().Msgf("running command: [%s]", command)
+
+	componentName, _, ok := strings.Cut(command, "_")
+
+	if !ok {
+		componentName = "unknown"
+	}
 
 	reqId := utils.NewRequestId()
-
-	// TODO: replace this with the actual user id
 	userId := "root"
 
+	logger := c.logger.With().Str("component", componentName).Str("req_id", reqId).Str("user_id", userId).Logger()
+
+	logger.Trace().Msgf("running command: [%s]", command)
+
 	appContext := app.NewContext(
-		c.ctx,
+		logger.WithContext(c.ctx),
 		userId,
 		reqId,
 		reqId,
 		reqId,
+		&logger,
 	)
 
 	var output any = nil

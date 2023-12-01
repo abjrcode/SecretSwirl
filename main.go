@@ -92,15 +92,15 @@ func main() {
 	}
 
 	timeProvider := utils.NewClock()
-	vault := vault.NewVault(db, timeProvider, logger)
+	vault := vault.NewVault(db, timeProvider)
 	defer vault.Seal()
 
-	authController := NewAuthController(vault, logger)
+	authController := NewAuthController(vault)
 
-	favoritesRepo := favorites.NewFavorites(db, logger)
-	dashboardController := NewDashboardController(favoritesRepo, logger)
+	favoritesRepo := favorites.NewFavorites(db)
+	dashboardController := NewDashboardController(favoritesRepo)
 
-	awsIdcController := awsiamidc.NewAwsIdentityCenterController(db, favoritesRepo, vault, awssso.NewAwsSsoOidcClient(), timeProvider, logger)
+	awsIdcController := awsiamidc.NewAwsIdentityCenterController(db, favoritesRepo, vault, awssso.NewAwsSsoOidcClient(), timeProvider)
 
 	appController := &AppController{
 		authController:      authController,

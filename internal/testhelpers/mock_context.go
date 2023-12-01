@@ -4,8 +4,10 @@ import (
 	"context"
 
 	"github.com/abjrcode/swervo/internal/app"
+	"github.com/rs/zerolog"
 )
 
 func NewMockAppContext() app.Context {
-	return app.NewContext(context.TODO(), "test_user_id", "test_request_id", "test_causation_id", "test_correlation_id")
+	logger := zerolog.Nop()
+	return app.NewContext(context.TODO(), "test_user_id", "test_request_id", "test_causation_id", "test_correlation_id", &logger)
 }

@@ -13,7 +13,6 @@ import (
 	"github.com/abjrcode/swervo/internal/security/encryption"
 	"github.com/abjrcode/swervo/internal/utils"
 	"github.com/awnumar/memguard"
-	"github.com/rs/zerolog"
 	"github.com/segmentio/ksuid"
 )
 
@@ -44,20 +43,16 @@ type Vault interface {
 type vaultImpl struct {
 	timeSvc       utils.Clock
 	db            *sql.DB
-	logger        zerolog.Logger
 	keyId         *string
 	encryptionKey *memguard.Enclave
 }
 
-func NewVault(db *sql.DB, timeSvc utils.Clock, logger zerolog.Logger) Vault {
+func NewVault(db *sql.DB, timeSvc utils.Clock) Vault {
 	memguard.CatchInterrupt()
-
-	enrichedLogger := logger.With().Str("component", "vault").Logger()
 
 	return &vaultImpl{
 		timeSvc: timeSvc,
 		db:      db,
-		logger:  enrichedLogger,
 	}
 }
 

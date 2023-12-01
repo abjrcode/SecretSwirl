@@ -9,7 +9,6 @@ import (
 	"github.com/abjrcode/swervo/internal/migrations"
 	"github.com/abjrcode/swervo/internal/security/vault"
 	"github.com/abjrcode/swervo/internal/testhelpers"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -54,14 +53,14 @@ func initController(t *testing.T) (*AwsIdentityCenterController, *mockAwsSsoOidc
 
 	awsClient := new(mockAwsSsoOidcClient)
 	mockDatetime := testhelpers.NewMockClock()
-	logger := zerolog.Nop()
-	favoritesRepo := favorites.NewFavorites(db, logger)
 
-	vault := vault.NewVault(db, mockDatetime, logger)
+	favoritesRepo := favorites.NewFavorites(db)
+
+	vault := vault.NewVault(db, mockDatetime)
 	timeSetCall := mockDatetime.On("NowUnix").Return(1)
 	err = vault.Configure(testhelpers.NewMockAppContext(), "abc")
 	require.NoError(t, err)
-	controller := NewAwsIdentityCenterController(db, favoritesRepo, vault, awsClient, mockDatetime, logger)
+	controller := NewAwsIdentityCenterController(db, favoritesRepo, vault, awsClient, mockDatetime)
 
 	timeSetCall.Unset()
 
