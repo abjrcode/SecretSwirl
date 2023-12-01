@@ -81,15 +81,15 @@ type GetRoleCredentialsResponse struct {
 }
 
 type AwsSsoOidcClient interface {
-	RegisterClient(ctx context.Context, friendlyClientName string) (*RegistrationResponse, error)
+	RegisterClient(ctx context.Context, awsRegion AwsRegion, friendlyClientName string) (*RegistrationResponse, error)
 
-	StartDeviceAuthorization(ctx context.Context, startUrl string, clientId, clientSecret string) (*AuthorizationResponse, error)
+	StartDeviceAuthorization(ctx context.Context, awsRegion AwsRegion, startUrl string, clientId, clientSecret string) (*AuthorizationResponse, error)
 
-	CreateToken(ctx context.Context, clientId, clientSecret, userCode, deviceCode string) (*GetTokenResponse, error)
+	CreateToken(ctx context.Context, awsRegion AwsRegion, clientId, clientSecret, userCode, deviceCode string) (*GetTokenResponse, error)
 
-	ListAccounts(ctx context.Context, accessToken string) (*ListAccountsResponse, error)
+	ListAccounts(ctx context.Context, awsRegion AwsRegion, accessToken string) (*ListAccountsResponse, error)
 
-	GetRoleCredentials(ctx context.Context, accountId, roleName, accessToken string) (*GetRoleCredentialsResponse, error)
+	GetRoleCredentials(ctx context.Context, awsRegion AwsRegion, accountId, roleName, accessToken string) (*GetRoleCredentialsResponse, error)
 }
 
 type awsSsoClientImpl struct {
@@ -104,12 +104,12 @@ func NewAwsSsoOidcClient() AwsSsoOidcClient {
 	}
 }
 
-func (c *awsSsoClientImpl) RegisterClient(ctx context.Context, friendlyClientName string) (*RegistrationResponse, error) {
+func (c *awsSsoClientImpl) RegisterClient(ctx context.Context, awsRegion AwsRegion, friendlyClientName string) (*RegistrationResponse, error) {
 	output, err := c.oidcClient.RegisterClient(ctx, &ssooidc.RegisterClientInput{
 		ClientName: aws.String(friendlyClientName),
 		ClientType: aws.String("public"),
 	}, func(options *ssooidc.Options) {
-		options.Region = ctx.Value(AwsRegion("awsRegion")).(string)
+		options.Region = string(awsRegion)
 	})
 
 	if err != nil {
@@ -124,13 +124,13 @@ func (c *awsSsoClientImpl) RegisterClient(ctx context.Context, friendlyClientNam
 	}, nil
 }
 
-func (c *awsSsoClientImpl) StartDeviceAuthorization(ctx context.Context, startUrl string, clientId, clientSecret string) (*AuthorizationResponse, error) {
+func (c *awsSsoClientImpl) StartDeviceAuthorization(ctx context.Context, region AwsRegion, startUrl string, clientId, clientSecret string) (*AuthorizationResponse, error) {
 	output, err := c.oidcClient.StartDeviceAuthorization(ctx, &ssooidc.StartDeviceAuthorizationInput{
 		ClientId:     aws.String(clientId),
 		ClientSecret: aws.String(clientSecret),
 		StartUrl:     aws.String(startUrl),
 	}, func(options *ssooidc.Options) {
-		options.Region = ctx.Value(AwsRegion("awsRegion")).(string)
+		options.Region = string(region)
 	})
 
 	if err != nil {
@@ -152,7 +152,7 @@ func (c *awsSsoClientImpl) StartDeviceAuthorization(ctx context.Context, startUr
 	}, nil
 }
 
-func (c *awsSsoClientImpl) CreateToken(ctx context.Context, clientId, clientSecret, userCode, deviceCode string) (*GetTokenResponse, error) {
+func (c *awsSsoClientImpl) CreateToken(ctx context.Context, region AwsRegion, clientId, clientSecret, userCode, deviceCode string) (*GetTokenResponse, error) {
 	output, err := c.oidcClient.CreateToken(ctx, &ssooidc.CreateTokenInput{
 		ClientId:     aws.String(clientId),
 		ClientSecret: aws.String(clientSecret),
@@ -160,7 +160,7 @@ func (c *awsSsoClientImpl) CreateToken(ctx context.Context, clientId, clientSecr
 		DeviceCode:   aws.String(deviceCode),
 		Code:         aws.String(userCode),
 	}, func(options *ssooidc.Options) {
-		options.Region = ctx.Value(AwsRegion("awsRegion")).(string)
+		options.Region = string(region)
 	})
 
 	if err != nil {
@@ -182,11 +182,11 @@ func (c *awsSsoClientImpl) CreateToken(ctx context.Context, clientId, clientSecr
 	}, nil
 }
 
-func (c *awsSsoClientImpl) ListAccounts(ctx context.Context, accessToken string) (*ListAccountsResponse, error) {
+func (c *awsSsoClientImpl) ListAccounts(ctx context.Context, region AwsRegion, accessToken string) (*ListAccountsResponse, error) {
 	output, err := c.ssoClient.ListAccounts(ctx, &sso.ListAccountsInput{
 		AccessToken: aws.String(accessToken),
 	}, func(options *sso.Options) {
-		options.Region = ctx.Value(AwsRegion("awsRegion")).(string)
+		options.Region = string(region)
 	})
 
 	if err != nil {
@@ -208,7 +208,7 @@ func (c *awsSsoClientImpl) ListAccounts(ctx context.Context, accessToken string)
 			AccessToken: aws.String(accessToken),
 			AccountId:   account.AccountId,
 		}, func(options *sso.Options) {
-			options.Region = ctx.Value(AwsRegion("awsRegion")).(string)
+			options.Region = string(region)
 		})
 
 		if err != nil {
@@ -234,13 +234,13 @@ func (c *awsSsoClientImpl) ListAccounts(ctx context.Context, accessToken string)
 	}, nil
 }
 
-func (c *awsSsoClientImpl) GetRoleCredentials(ctx context.Context, accountId, roleName, accessToken string) (*GetRoleCredentialsResponse, error) {
+func (c *awsSsoClientImpl) GetRoleCredentials(ctx context.Context, region AwsRegion, accountId, roleName, accessToken string) (*GetRoleCredentialsResponse, error) {
 	output, err := c.ssoClient.GetRoleCredentials(ctx, &sso.GetRoleCredentialsInput{
 		AccountId:   aws.String(accountId),
 		RoleName:    aws.String(roleName),
 		AccessToken: aws.String(accessToken),
 	}, func(options *sso.Options) {
-		options.Region = ctx.Value(AwsRegion("awsRegion")).(string)
+		options.Region = string(region)
 	})
 
 	if err != nil {
