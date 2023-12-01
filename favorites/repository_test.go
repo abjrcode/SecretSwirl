@@ -1,10 +1,10 @@
 package favorites
 
 import (
-	"context"
 	"testing"
 
 	"github.com/abjrcode/swervo/internal/migrations"
+	"github.com/abjrcode/swervo/internal/testhelpers"
 	"github.com/abjrcode/swervo/providers"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -22,7 +22,7 @@ func TestAddFavorite(t *testing.T) {
 		InstanceId:   "some-nice-id",
 	}
 
-	ctx := context.Background()
+	ctx := testhelpers.NewMockAppContext()
 	err = repo.Add(ctx, favorite)
 	require.NoError(t, err)
 
@@ -40,7 +40,7 @@ func TestRemoveFavorite(t *testing.T) {
 	logger := zerolog.Nop()
 
 	repo := NewFavorites(db, logger)
-	ctx := context.Background()
+	ctx := testhelpers.NewMockAppContext()
 
 	favorite := &Favorite{
 		ProviderCode: providers.AwsIamIdc,
@@ -72,7 +72,7 @@ func TestIsFavorite(t *testing.T) {
 	logger := zerolog.Nop()
 
 	repo := NewFavorites(db, logger)
-	ctx := context.Background()
+	ctx := testhelpers.NewMockAppContext()
 
 	favorite := &Favorite{
 		ProviderCode: providers.AwsIamIdc,

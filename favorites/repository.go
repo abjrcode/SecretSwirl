@@ -1,10 +1,10 @@
 package favorites
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 
+	"github.com/abjrcode/swervo/internal/app"
 	"github.com/rs/zerolog"
 )
 
@@ -14,10 +14,10 @@ type Favorite struct {
 }
 
 type FavoritesRepo interface {
-	ListAll(ctx context.Context) ([]*Favorite, error)
-	IsFavorite(ctx context.Context, favorite *Favorite) (bool, error)
-	Add(ctx context.Context, favorite *Favorite) error
-	Remove(ctx context.Context, favorite *Favorite) error
+	ListAll(ctx app.Context) ([]*Favorite, error)
+	IsFavorite(ctx app.Context, favorite *Favorite) (bool, error)
+	Add(ctx app.Context, favorite *Favorite) error
+	Remove(ctx app.Context, favorite *Favorite) error
 }
 
 type favoritesImpl struct {
@@ -34,7 +34,7 @@ func NewFavorites(db *sql.DB, logger zerolog.Logger) FavoritesRepo {
 	}
 }
 
-func (f *favoritesImpl) ListAll(ctx context.Context) ([]*Favorite, error) {
+func (f *favoritesImpl) ListAll(ctx app.Context) ([]*Favorite, error) {
 	rows, err := f.db.QueryContext(ctx, `SELECT * FROM favorite_instances`)
 
 	if err != nil {
@@ -61,7 +61,7 @@ func (f *favoritesImpl) ListAll(ctx context.Context) ([]*Favorite, error) {
 	return favorites, nil
 }
 
-func (f *favoritesImpl) IsFavorite(ctx context.Context, favorite *Favorite) (bool, error) {
+func (f *favoritesImpl) IsFavorite(ctx app.Context, favorite *Favorite) (bool, error) {
 	row := f.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM favorite_instances WHERE provider_code = ? AND instance_id = ? `, favorite.ProviderCode, favorite.InstanceId)
 
 	var count int
@@ -78,7 +78,7 @@ func (f *favoritesImpl) IsFavorite(ctx context.Context, favorite *Favorite) (boo
 	return count > 0, nil
 }
 
-func (f *favoritesImpl) Add(ctx context.Context, favorite *Favorite) error {
+func (f *favoritesImpl) Add(ctx app.Context, favorite *Favorite) error {
 	_, err := f.db.ExecContext(ctx, `INSERT INTO favorite_instances (provider_code, instance_id) VALUES (?, ?) `, favorite.ProviderCode, favorite.InstanceId)
 
 	if err != nil {
@@ -88,7 +88,7 @@ func (f *favoritesImpl) Add(ctx context.Context, favorite *Favorite) error {
 	return nil
 }
 
-func (f *favoritesImpl) Remove(ctx context.Context, favorite *Favorite) error {
+func (f *favoritesImpl) Remove(ctx app.Context, favorite *Favorite) error {
 	res, err := f.db.ExecContext(ctx, `DELETE FROM favorite_instances WHERE provider_code = ? AND instance_id = ? `, favorite.ProviderCode, favorite.InstanceId)
 
 	if err != nil {

@@ -7,8 +7,8 @@ import (
 	"io/fs"
 	"os"
 
+	"github.com/abjrcode/swervo/internal/app"
 	"github.com/abjrcode/swervo/internal/datastore"
-	"github.com/abjrcode/swervo/internal/faults"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/sqlite3"
 	"github.com/golang-migrate/migrate/v4/source"
@@ -130,7 +130,7 @@ func (runner *MigrationRunner) RunSafe() error {
 	db, err := runner.appStore.Open()
 
 	if err != nil {
-		errors.Join(errors.New("could not open database"), faults.ErrFatal)
+		errors.Join(errors.New("could not open database"), app.ErrFatal)
 	}
 
 	defer runner.appStore.Close(db)
@@ -138,7 +138,7 @@ func (runner *MigrationRunner) RunSafe() error {
 	shouldRunMigrations, currentVersion, nextUp, err := runner.shouldRunMigrations(db)
 
 	if err != nil {
-		return errors.Join(errors.New("could not determine if migrations should run"), err, faults.ErrFatal)
+		return errors.Join(errors.New("could not determine if migrations should run"), err, app.ErrFatal)
 	}
 
 	runner.logger.Debug().Msgf("shouldRunMigrations: %t, currentVersion: %d, nextUp: %d", shouldRunMigrations, currentVersion, nextUp)
@@ -146,7 +146,7 @@ func (runner *MigrationRunner) RunSafe() error {
 	if shouldRunMigrations {
 		runner.logger.Info().Msg("taking a database backup")
 		if err := runner.appStore.TakeBackup(); err != nil {
-			return errors.Join(errors.New("could not take database backup"), err, faults.ErrFatal)
+			return errors.Join(errors.New("could not take database backup"), err, app.ErrFatal)
 		}
 
 		runner.logger.Info().Msgf("migrating database from @[%d] to @[%d]", currentVersion, nextUp)
