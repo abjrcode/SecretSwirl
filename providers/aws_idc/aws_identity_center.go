@@ -32,6 +32,16 @@ var (
 	ErrTransientAwsClientError     = errors.New("TRANSIENT_AWS_CLIENT_ERROR")
 )
 
+var AwsIdcEventSource = eventing.EventSource("AwsIdc")
+
+type AwsIdcInstanceCreatedEvent struct {
+	InstanceId string
+
+	StartUrl string
+	Region   string
+	Label    string
+}
+
 type AwsIdentityCenterController struct {
 	db                *sql.DB
 	bus               *eventing.Eventbus
@@ -469,11 +479,17 @@ func (c *AwsIdentityCenterController) FinalizeSetup(ctx app.Context, input AwsId
 	instanceId := uniqueId.String()
 	version := 1
 
+	tx, err := c.db.BeginTx(ctx, nil)
+	if err != nil {
+		return "", errors.Join(err, app.ErrFatal)
+	}
+	defer tx.Rollback()
+
 	sql := `INSERT INTO aws_idc
 	(instance_id, version, start_url, region, label, enabled, id_token_enc, access_token_enc, token_type, access_token_created_at,
 		access_token_expires_in, refresh_token_enc, enc_key_id)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	_, err = c.db.ExecContext(ctx, sql,
+	_, err = tx.ExecContext(ctx, sql,
 		instanceId,
 		version,
 		input.StartUrl,
@@ -491,6 +507,28 @@ func (c *AwsIdentityCenterController) FinalizeSetup(ctx app.Context, input AwsId
 	if err != nil {
 		return "", errors.Join(err, app.ErrFatal)
 	}
+
+	publish, err := c.bus.PublishTx(ctx, AwsIdcInstanceCreatedEvent{
+		InstanceId: instanceId,
+		StartUrl:   input.StartUrl,
+		Region:     input.AwsRegion,
+		Label:      input.Label,
+	}, eventing.EventMeta{
+		SourceType:   AwsIdcEventSource,
+		SourceId:     instanceId,
+		EventVersion: uint(version),
+	}, tx)
+
+	if err != nil {
+		return "", errors.Join(err, app.ErrFatal)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return "", errors.Join(err, app.ErrFatal)
+	}
+
+	publish()
 
 	return instanceId, nil
 }

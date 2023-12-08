@@ -24,12 +24,9 @@ func Test_Publish(t *testing.T) {
 
 	ctx := testhelpers.NewMockAppContext()
 
-	sub, err := bus.Subscribe("test-topic")
-	require.NoError(t, err)
-	anotherSub, err := bus.Subscribe("test-topic")
-	require.NoError(t, err)
-	notInterestedSub, err := bus.Subscribe("another-topic")
-	require.NoError(t, err)
+	sub := bus.Subscribe("test-topic")
+	anotherSub := bus.Subscribe("test-topic")
+	notInterestedSub := bus.Subscribe("another-topic")
 
 	err = bus.Publish(ctx, TestEvent{A: "a", B: 1}, EventMeta{
 		EventVersion: 1,
@@ -84,7 +81,7 @@ func Test_Publish_WithTransaction(t *testing.T) {
 
 	ctx := testhelpers.NewMockAppContext()
 
-	sub, err := bus.Subscribe("test-topic")
+	sub := bus.Subscribe("test-topic")
 	require.NoError(t, err)
 
 	tx, err := db.Begin()
@@ -135,7 +132,7 @@ func Test_Publish_WithFailingTransaction(t *testing.T) {
 
 	ctx := testhelpers.NewMockAppContext()
 
-	sub, err := bus.Subscribe("test-topic")
+	sub := bus.Subscribe("test-topic")
 	require.NoError(t, err)
 
 	tx, err := db.Begin()
@@ -193,7 +190,7 @@ func Test_Close_ThenPublish(t *testing.T) {
 
 	ctx := testhelpers.NewMockAppContext()
 
-	_, err = bus.Subscribe("test-topic")
+	bus.Subscribe("test-topic")
 	require.NoError(t, err)
 
 	bus.Close()
@@ -214,26 +211,10 @@ func Test_Close_ClosesSubscriptionChannels(t *testing.T) {
 
 	bus := NewEventbus(db, mockClock)
 
-	sub, err := bus.Subscribe("test-topic")
-	require.NoError(t, err)
+	sub := bus.Subscribe("test-topic")
 
 	bus.Close()
 
 	_, ok := <-sub
 	require.False(t, ok)
-}
-
-func Test_Close_ThenSubscribe(t *testing.T) {
-	db, err := migrations.NewInMemoryMigratedDatabase(t, "eventbus-tests")
-	require.NoError(t, err)
-	mockClock := testhelpers.NewMockClock()
-
-	bus := NewEventbus(db, mockClock)
-
-	bus.Close()
-
-	sub, err := bus.Subscribe("test-topic")
-
-	require.ErrorIs(t, err, ErrBusClosed)
-	require.Nil(t, sub)
 }

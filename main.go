@@ -89,7 +89,6 @@ func main() {
 		if err := migrationRunner.RunSafe(); err != nil {
 			errorHandler.CatchWithMsg(nil, logger, err, "error when running migrations")
 		}
-
 	}
 
 	clock := utils.NewClock()
