@@ -3,9 +3,9 @@ package vault
 import (
 	"testing"
 
+	"github.com/abjrcode/swervo/internal/eventing"
 	"github.com/abjrcode/swervo/internal/migrations"
 	"github.com/abjrcode/swervo/internal/testhelpers"
-	"github.com/abjrcode/swervo/internal/utils"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,8 +14,9 @@ import (
 func TestIsSetup(t *testing.T) {
 	db, err := migrations.NewInMemoryMigratedDatabase(t, "TestIsSetup")
 	require.NoError(t, err)
+	mockClock := testhelpers.NewMockClock()
 
-	v := NewVault(db, utils.NewClock())
+	v := NewVault(db, eventing.NewEventbus(db, mockClock), mockClock)
 	t.Cleanup(v.Seal)
 
 	isSetup, err := v.IsConfigured(testhelpers.NewMockAppContext())
@@ -24,11 +25,13 @@ func TestIsSetup(t *testing.T) {
 	assert.False(t, isSetup)
 }
 
-func TestIsSetupAfterConfigure(t *testing.T) {
+func TestIsSetup_AfterConfigure(t *testing.T) {
 	db, err := migrations.NewInMemoryMigratedDatabase(t, "TestIsSetupAfterConfigure")
 	require.NoError(t, err)
+	mockClock := testhelpers.NewMockClock()
 
-	v := NewVault(db, utils.NewClock())
+	mockClock.On("NowUnix").Return(1)
+	v := NewVault(db, eventing.NewEventbus(db, mockClock), mockClock)
 	t.Cleanup(v.Seal)
 
 	ctx := testhelpers.NewMockAppContext()
@@ -42,12 +45,13 @@ func TestIsSetupAfterConfigure(t *testing.T) {
 	assert.True(t, isSetup)
 }
 
-func TestOpenNotConfiguredVault(t *testing.T) {
+func TestOpen_NotConfiguredVault(t *testing.T) {
 	db, err := migrations.NewInMemoryMigratedDatabase(t, "TestConfigureVault")
-
 	require.NoError(t, err)
+	mockClock := testhelpers.NewMockClock()
 
-	v := NewVault(db, utils.NewClock())
+	v := NewVault(db, eventing.NewEventbus(db, mockClock), mockClock)
+
 	t.Cleanup(v.Seal)
 
 	_, err = v.Open(testhelpers.NewMockAppContext(), "password")
@@ -57,22 +61,35 @@ func TestOpenNotConfiguredVault(t *testing.T) {
 
 func TestConfigureVault(t *testing.T) {
 	db, err := migrations.NewInMemoryMigratedDatabase(t, "TestConfigureVault")
+	require.NoError(t, err)
+	mockClock := testhelpers.NewMockClock()
+	bus := eventing.NewEventbus(db, mockClock)
+	mockClock.On("NowUnix").Return(1)
 
+	vault := NewVault(db, bus, mockClock)
+	t.Cleanup(vault.Seal)
+
+	ch := bus.Subscribe(VaultEventSource)
 	require.NoError(t, err)
 
-	v := NewVault(db, utils.NewClock())
-	t.Cleanup(v.Seal)
-
-	err = v.Configure(testhelpers.NewMockAppContext(), "password")
-
+	err = vault.Configure(testhelpers.NewMockAppContext(), "password")
 	assert.NoError(t, err)
+
+	event := <-ch
+
+	assert.Equal(t, uint(1), event.EventVersion)
+	assert.IsType(t, VaultConfiguredEvent{}, event.Data)
+	assert.Equal(t, VaultEventSource, event.SourceType)
 }
 
-func TestConfigureVaultTwice(t *testing.T) {
+func TestConfigureVault_Twice(t *testing.T) {
 	db, err := migrations.NewInMemoryMigratedDatabase(t, "TestConfigureVaultTwice")
 	require.NoError(t, err)
+	mockClock := testhelpers.NewMockClock()
 
-	v := NewVault(db, utils.NewClock())
+	mockClock.On("NowUnix").Return(1)
+	v := NewVault(db, eventing.NewEventbus(db, mockClock), mockClock)
+
 	t.Cleanup(v.Seal)
 
 	ctx := testhelpers.NewMockAppContext()
@@ -84,11 +101,15 @@ func TestConfigureVaultTwice(t *testing.T) {
 	require.ErrorIs(t, err, ErrVaultAlreadyConfigured)
 }
 
-func TestOpenVaultCorrectPassword(t *testing.T) {
+func TestOpenVault_CorrectPassword(t *testing.T) {
 	db, err := migrations.NewInMemoryMigratedDatabase(t, "TestOpenVault")
 	require.NoError(t, err)
+	mockClock := testhelpers.NewMockClock()
 
-	v := NewVault(db, utils.NewClock())
+	mockClock.On("NowUnix").Return(1)
+
+	v := NewVault(db, eventing.NewEventbus(db, mockClock), mockClock)
+
 	t.Cleanup(v.Seal)
 
 	ctx := testhelpers.NewMockAppContext()
@@ -105,8 +126,12 @@ func TestOpenVaultCorrectPassword(t *testing.T) {
 func TestVault_OpenTwice(t *testing.T) {
 	db, err := migrations.NewInMemoryMigratedDatabase(t, "TestOpenVault")
 	require.NoError(t, err)
+	mockClock := testhelpers.NewMockClock()
 
-	v := NewVault(db, utils.NewClock())
+	mockClock.On("NowUnix").Return(1)
+
+	v := NewVault(db, eventing.NewEventbus(db, mockClock), mockClock)
+
 	t.Cleanup(v.Seal)
 
 	ctx := testhelpers.NewMockAppContext()
@@ -123,11 +148,14 @@ func TestVault_OpenTwice(t *testing.T) {
 	assert.True(t, success)
 }
 
-func TestOpenVaultWithWrongPassword(t *testing.T) {
+func TestOpenVault_WithWrongPassword(t *testing.T) {
 	db, err := migrations.NewInMemoryMigratedDatabase(t, "TestOpenVaultWithWrongPassword")
 	require.NoError(t, err)
+	mockClock := testhelpers.NewMockClock()
 
-	vault := NewVault(db, utils.NewClock())
+	mockClock.On("NowUnix").Return(1)
+
+	vault := NewVault(db, eventing.NewEventbus(db, mockClock), mockClock)
 	t.Cleanup(vault.Seal)
 
 	ctx := testhelpers.NewMockAppContext()
@@ -145,8 +173,11 @@ func TestOpenVaultWithWrongPassword(t *testing.T) {
 func TestEncryptDecrypt(t *testing.T) {
 	db, err := migrations.NewInMemoryMigratedDatabase(t, "TestEncryptDecrypt")
 	require.NoError(t, err)
+	mockClock := testhelpers.NewMockClock()
 
-	vault := NewVault(db, utils.NewClock())
+	mockClock.On("NowUnix").Return(1)
+
+	vault := NewVault(db, eventing.NewEventbus(db, mockClock), mockClock)
 	t.Cleanup(vault.Seal)
 
 	err = vault.Configure(testhelpers.NewMockAppContext(), "123")
@@ -161,11 +192,15 @@ func TestEncryptDecrypt(t *testing.T) {
 	assert.Equal(t, "hello", decrypted)
 }
 
-func TestEncryptDecryptAfterVaultSealAndOpen(t *testing.T) {
+func TestEncryptDecrypt_AfterVaultSealAndOpen(t *testing.T) {
 	db, err := migrations.NewInMemoryMigratedDatabase(t, "TestEncryptDecrypt")
 	require.NoError(t, err)
+	mockClock := testhelpers.NewMockClock()
 
-	vault := NewVault(db, utils.NewClock())
+	mockClock.On("NowUnix").Return(1)
+
+	vault := NewVault(db, eventing.NewEventbus(db, mockClock), mockClock)
+
 	t.Cleanup(vault.Seal)
 
 	ctx := testhelpers.NewMockAppContext()
@@ -193,7 +228,9 @@ func TestEncryptDecryptWithWrongPassword(t *testing.T) {
 
 	originalDb, err := migrations.NewInMemoryMigratedDatabase(t, "TestEncryptDecryptWithWrongPasswordOriginal")
 	require.NoError(t, err)
-	originalVault := NewVault(originalDb, utils.NewClock())
+	originalClock := testhelpers.NewMockClock()
+	originalClock.On("NowUnix").Return(1)
+	originalVault := NewVault(originalDb, eventing.NewEventbus(originalDb, originalClock), originalClock)
 	err = originalVault.Configure(ctx, "123")
 	require.NoError(t, err)
 	encrypted, keyId, err := originalVault.Encrypt("hello")
@@ -202,7 +239,9 @@ func TestEncryptDecryptWithWrongPassword(t *testing.T) {
 
 	newDb, err := migrations.NewInMemoryMigratedDatabase(t, "TestEncryptDecryptWithWrongPasswordNew")
 	require.NoError(t, err)
-	newVault := NewVault(newDb, utils.NewClock())
+	newClock := testhelpers.NewMockClock()
+	newClock.On("NowUnix").Return(2)
+	newVault := NewVault(newDb, eventing.NewEventbus(newDb, newClock), newClock)
 	err = newVault.Configure(ctx, "321")
 	require.NoError(t, err)
 	_, err = newVault.Decrypt(encrypted, keyId)
@@ -213,8 +252,11 @@ func TestEncryptDecryptWithWrongPassword(t *testing.T) {
 func TestEncryptDecryptErrorOnSealedVault(t *testing.T) {
 	db, err := migrations.NewInMemoryMigratedDatabase(t, "TestEncryptDecryptAfterVaultSeal")
 	require.NoError(t, err)
+	mockClock := testhelpers.NewMockClock()
 
-	vault := NewVault(db, utils.NewClock())
+	mockClock.On("NowUnix").Return(1)
+
+	vault := NewVault(db, eventing.NewEventbus(db, mockClock), mockClock)
 
 	err = vault.Configure(testhelpers.NewMockAppContext(), "123")
 	require.NoError(t, err)

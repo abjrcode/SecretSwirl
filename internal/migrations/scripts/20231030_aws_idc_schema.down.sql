@@ -1,2 +1,2 @@
-DROP TABLE IF EXISTS "aws_iam_idc_clients";
-DROP TABLE IF EXISTS "aws_iam_idc_instances";
+DROP TABLE IF EXISTS "aws_sso_clients";
+DROP TABLE IF EXISTS "aws_idc";

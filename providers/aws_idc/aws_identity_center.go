@@ -1,4 +1,4 @@
-package awsiamidc
+package awsidc
 
 import (
 	"bytes"
@@ -12,6 +12,7 @@ import (
 	"github.com/abjrcode/swervo/clients/awssso"
 	"github.com/abjrcode/swervo/favorites"
 	"github.com/abjrcode/swervo/internal/app"
+	"github.com/abjrcode/swervo/internal/eventing"
 	"github.com/abjrcode/swervo/internal/security/encryption"
 	"github.com/abjrcode/swervo/internal/utils"
 	"github.com/abjrcode/swervo/providers"
@@ -31,8 +32,19 @@ var (
 	ErrTransientAwsClientError     = errors.New("TRANSIENT_AWS_CLIENT_ERROR")
 )
 
+var AwsIdcEventSource = eventing.EventSource("AwsIdc")
+
+type AwsIdcInstanceCreatedEvent struct {
+	InstanceId string
+
+	StartUrl string
+	Region   string
+	Label    string
+}
+
 type AwsIdentityCenterController struct {
 	db                *sql.DB
+	bus               *eventing.Eventbus
 	favoritesRepo     favorites.FavoritesRepo
 	encryptionService encryption.EncryptionService
 	awsSsoClient      awssso.AwsSsoOidcClient
@@ -40,12 +52,13 @@ type AwsIdentityCenterController struct {
 	cache             *freecache.Cache
 }
 
-func NewAwsIdentityCenterController(db *sql.DB, favoritesRepo favorites.FavoritesRepo, encryptionService encryption.EncryptionService, awsSsoClient awssso.AwsSsoOidcClient, datetime utils.Clock) *AwsIdentityCenterController {
+func NewAwsIdentityCenterController(db *sql.DB, bus *eventing.Eventbus, favoritesRepo favorites.FavoritesRepo, encryptionService encryption.EncryptionService, awsSsoClient awssso.AwsSsoOidcClient, datetime utils.Clock) *AwsIdentityCenterController {
 	fiveHundredTwelveKilobytes := 512 * 1024
 	cache := freecache.NewCache(fiveHundredTwelveKilobytes)
 
 	return &AwsIdentityCenterController{
 		db:                db,
+		bus:               bus,
 		favoritesRepo:     favoritesRepo,
 		encryptionService: encryptionService,
 		awsSsoClient:      awsSsoClient,
@@ -82,7 +95,7 @@ type AwsIdentityCenterCardData struct {
 }
 
 func (c *AwsIdentityCenterController) ListInstances(ctx app.Context) ([]string, error) {
-	rows, err := c.db.QueryContext(ctx, "SELECT instance_id FROM aws_iam_idc_instances ORDER BY instance_id DESC")
+	rows, err := c.db.QueryContext(ctx, "SELECT instance_id FROM aws_idc ORDER BY instance_id DESC")
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -108,7 +121,7 @@ func (c *AwsIdentityCenterController) ListInstances(ctx app.Context) ([]string, 
 }
 
 func (c *AwsIdentityCenterController) GetInstanceData(ctx app.Context, instanceId string, forceRefresh bool) (*AwsIdentityCenterCardData, error) {
-	row := c.db.QueryRowContext(ctx, "SELECT region, label, access_token_enc, access_token_created_at, access_token_expires_in, enc_key_id FROM aws_iam_idc_instances WHERE instance_id = ?", instanceId)
+	row := c.db.QueryRowContext(ctx, "SELECT region, label, access_token_enc, access_token_created_at, access_token_expires_in, enc_key_id FROM aws_idc WHERE instance_id = ?", instanceId)
 
 	var region string
 	var label string
@@ -126,7 +139,7 @@ func (c *AwsIdentityCenterController) GetInstanceData(ctx app.Context, instanceI
 	}
 
 	isFavorite, err := c.favoritesRepo.IsFavorite(ctx, &favorites.Favorite{
-		ProviderCode: providers.AwsIamIdc,
+		ProviderCode: providers.AwsIdc,
 		InstanceId:   instanceId,
 	})
 
@@ -233,14 +246,14 @@ func (c *AwsIdentityCenterController) GetInstanceData(ctx app.Context, instanceI
 	}, nil
 }
 
-type AwsIamIdc_GetRoleCredentialsCommandInput struct {
+type AwsIdc_GetRoleCredentialsCommandInput struct {
 	InstanceId string `json:"instanceId"`
 	AccountId  string `json:"accountId"`
 	RoleName   string `json:"roleName"`
 }
 
-func (c *AwsIdentityCenterController) GetRoleCredentials(ctx app.Context, input AwsIamIdc_GetRoleCredentialsCommandInput) (*AwsIdentityCenterAccountRoleCredentials, error) {
-	row := c.db.QueryRowContext(ctx, "SELECT region, access_token_enc, access_token_created_at, access_token_expires_in, enc_key_id FROM aws_iam_idc_instances WHERE instance_id = ?", input.InstanceId)
+func (c *AwsIdentityCenterController) GetRoleCredentials(ctx app.Context, input AwsIdc_GetRoleCredentialsCommandInput) (*AwsIdentityCenterAccountRoleCredentials, error) {
+	row := c.db.QueryRowContext(ctx, "SELECT region, access_token_enc, access_token_created_at, access_token_expires_in, enc_key_id FROM aws_idc WHERE instance_id = ?", input.InstanceId)
 
 	var region string
 	var accessTokenEnc string
@@ -315,13 +328,13 @@ type AuthorizeDeviceFlowResult struct {
 	DeviceCode      string `json:"deviceCode"`
 }
 
-type AwsIamIdc_SetupCommandInput struct {
+type AwsIdc_SetupCommandInput struct {
 	StartUrl  string `json:"startUrl"`
 	AwsRegion string `json:"awsRegion"`
 	Label     string `json:"label"`
 }
 
-func (c *AwsIdentityCenterController) Setup(ctx app.Context, input AwsIamIdc_SetupCommandInput) (*AuthorizeDeviceFlowResult, error) {
+func (c *AwsIdentityCenterController) Setup(ctx app.Context, input AwsIdc_SetupCommandInput) (*AuthorizeDeviceFlowResult, error) {
 	if err := c.validateStartUrl(input.StartUrl); err != nil {
 		return nil, err
 	}
@@ -339,7 +352,7 @@ func (c *AwsIdentityCenterController) Setup(ctx app.Context, input AwsIamIdc_Set
 	label := input.Label
 
 	var exists bool
-	err := c.db.QueryRowContext(ctx, "SELECT 1 FROM aws_iam_idc_instances WHERE start_url = ?", startUrl).Scan(&exists)
+	err := c.db.QueryRowContext(ctx, "SELECT 1 FROM aws_idc WHERE start_url = ?", startUrl).Scan(&exists)
 
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, errors.Join(err, app.ErrFatal)
@@ -386,7 +399,7 @@ func (c *AwsIdentityCenterController) Setup(ctx app.Context, input AwsIamIdc_Set
 	}, nil
 }
 
-type AwsIamIdc_FinalizeSetupCommandInput struct {
+type AwsIdc_FinalizeSetupCommandInput struct {
 	ClientId   string `json:"clientId"`
 	StartUrl   string `json:"startUrl"`
 	AwsRegion  string `json:"awsRegion"`
@@ -395,7 +408,7 @@ type AwsIamIdc_FinalizeSetupCommandInput struct {
 	DeviceCode string `json:"deviceCode"`
 }
 
-func (c *AwsIdentityCenterController) FinalizeSetup(ctx app.Context, input AwsIamIdc_FinalizeSetupCommandInput) (string, error) {
+func (c *AwsIdentityCenterController) FinalizeSetup(ctx app.Context, input AwsIdc_FinalizeSetupCommandInput) (string, error) {
 	if err := c.validateLabel(input.Label); err != nil {
 		return "", err
 	}
@@ -408,7 +421,7 @@ func (c *AwsIdentityCenterController) FinalizeSetup(ctx app.Context, input AwsIa
 		return "", err
 	}
 
-	row := c.db.QueryRowContext(ctx, "SELECT client_secret_enc, enc_key_id FROM aws_iam_idc_clients")
+	row := c.db.QueryRowContext(ctx, "SELECT client_secret_enc, enc_key_id FROM aws_sso_clients")
 
 	var clientSecretEnc string
 	var encKeyId string
@@ -464,13 +477,21 @@ func (c *AwsIdentityCenterController) FinalizeSetup(ctx app.Context, input AwsIa
 		return "", errors.Join(err, app.ErrFatal)
 	}
 	instanceId := uniqueId.String()
+	version := 1
 
-	sql := `INSERT INTO aws_iam_idc_instances
-	(instance_id, start_url, region, label, enabled, id_token_enc, access_token_enc, token_type, access_token_created_at,
+	tx, err := c.db.BeginTx(ctx, nil)
+	if err != nil {
+		return "", errors.Join(err, app.ErrFatal)
+	}
+	defer tx.Rollback()
+
+	sql := `INSERT INTO aws_idc
+	(instance_id, version, start_url, region, label, enabled, id_token_enc, access_token_enc, token_type, access_token_created_at,
 		access_token_expires_in, refresh_token_enc, enc_key_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	_, err = c.db.ExecContext(ctx, sql,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	_, err = tx.ExecContext(ctx, sql,
 		instanceId,
+		version,
 		input.StartUrl,
 		input.AwsRegion,
 		input.Label,
@@ -487,19 +508,41 @@ func (c *AwsIdentityCenterController) FinalizeSetup(ctx app.Context, input AwsIa
 		return "", errors.Join(err, app.ErrFatal)
 	}
 
+	publish, err := c.bus.PublishTx(ctx, AwsIdcInstanceCreatedEvent{
+		InstanceId: instanceId,
+		StartUrl:   input.StartUrl,
+		Region:     input.AwsRegion,
+		Label:      input.Label,
+	}, eventing.EventMeta{
+		SourceType:   AwsIdcEventSource,
+		SourceId:     instanceId,
+		EventVersion: uint(version),
+	}, tx)
+
+	if err != nil {
+		return "", errors.Join(err, app.ErrFatal)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return "", errors.Join(err, app.ErrFatal)
+	}
+
+	publish()
+
 	return instanceId, nil
 }
 
 func (c *AwsIdentityCenterController) MarkAsFavorite(ctx app.Context, instanceId string) error {
 	return c.favoritesRepo.Add(ctx, &favorites.Favorite{
-		ProviderCode: providers.AwsIamIdc,
+		ProviderCode: providers.AwsIdc,
 		InstanceId:   instanceId,
 	})
 }
 
 func (c *AwsIdentityCenterController) UnmarkAsFavorite(ctx app.Context, instanceId string) error {
 	return c.favoritesRepo.Remove(ctx, &favorites.Favorite{
-		ProviderCode: providers.AwsIamIdc,
+		ProviderCode: providers.AwsIdc,
 		InstanceId:   instanceId,
 	})
 }
@@ -509,7 +552,7 @@ func (c *AwsIdentityCenterController) RefreshAccessToken(ctx app.Context, instan
 	var awsRegion string
 	var label string
 
-	row := c.db.QueryRowContext(ctx, "SELECT start_url, region, label FROM aws_iam_idc_instances WHERE instance_id = ?", instanceId)
+	row := c.db.QueryRowContext(ctx, "SELECT start_url, region, label FROM aws_idc WHERE instance_id = ?", instanceId)
 
 	if err := row.Scan(&startUrl, &awsRegion, &label); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -545,19 +588,19 @@ func (c *AwsIdentityCenterController) RefreshAccessToken(ctx app.Context, instan
 	}, nil
 }
 
-type AwsIamIdc_FinalizeRefreshAccessTokenCommandInput struct {
+type AwsIdc_FinalizeRefreshAccessTokenCommandInput struct {
 	InstanceId string `json:"instanceId"`
 	Region     string `json:"region"`
 	UserCode   string `json:"userCode"`
 	DeviceCode string `json:"deviceCode"`
 }
 
-func (c *AwsIdentityCenterController) FinalizeRefreshAccessToken(ctx app.Context, input AwsIamIdc_FinalizeRefreshAccessTokenCommandInput) error {
+func (c *AwsIdentityCenterController) FinalizeRefreshAccessToken(ctx app.Context, input AwsIdc_FinalizeRefreshAccessTokenCommandInput) error {
 	if err := c.validateAwsRegion(input.Region); err != nil {
 		return err
 	}
 
-	row := c.db.QueryRowContext(ctx, "SELECT client_id, client_secret_enc, enc_key_id FROM aws_iam_idc_clients")
+	row := c.db.QueryRowContext(ctx, "SELECT client_id, client_secret_enc, enc_key_id FROM aws_sso_clients")
 
 	var clientId string
 	var clientSecretEnc string
@@ -610,7 +653,7 @@ func (c *AwsIdentityCenterController) FinalizeRefreshAccessToken(ctx app.Context
 
 	ctx.Logger().Info().Msgf("refreshing access token for instance [%s]", input.InstanceId)
 
-	sql := `UPDATE aws_iam_idc_instances SET
+	sql := `UPDATE aws_idc SET
 		id_token_enc = ?,
 		access_token_enc = ?,
 		token_type = ?,
@@ -650,7 +693,7 @@ func (c *AwsIdentityCenterController) FinalizeRefreshAccessToken(ctx app.Context
 }
 
 func (c *AwsIdentityCenterController) getOrRegisterClient(ctx app.Context, awsRegion string) (*awssso.RegistrationResponse, error) {
-	row := c.db.QueryRowContext(ctx, "SELECT client_id, client_secret_enc, created_at, expires_at, enc_key_id FROM aws_iam_idc_clients")
+	row := c.db.QueryRowContext(ctx, "SELECT client_id, client_secret_enc, created_at, expires_at, enc_key_id FROM aws_sso_clients")
 
 	var encKeyId string
 	var result awssso.RegistrationResponse
@@ -681,7 +724,7 @@ func (c *AwsIdentityCenterController) getOrRegisterClient(ctx app.Context, awsRe
 			return nil, errors.Join(err, app.ErrFatal)
 		}
 
-		_, err = c.db.ExecContext(ctx, `INSERT INTO aws_iam_idc_clients
+		_, err = c.db.ExecContext(ctx, `INSERT INTO aws_sso_clients
 			(client_id, client_secret_enc, created_at, expires_at, enc_key_id)
 			VALUES (?, ?, ?, ?, ?)`,
 			output.ClientId, clientSecretEnc, output.CreatedAt, output.ExpiresAt, encKeyId)
@@ -713,7 +756,7 @@ func (c *AwsIdentityCenterController) getOrRegisterClient(ctx app.Context, awsRe
 			return nil, errors.Join(err, app.ErrFatal)
 		}
 
-		_, err = c.db.ExecContext(ctx, `UPDATE aws_iam_idc_clients SET
+		_, err = c.db.ExecContext(ctx, `UPDATE aws_sso_clients SET
 			client_id = ?,
 			client_secret_enc = ?,
 			created_at = ?,

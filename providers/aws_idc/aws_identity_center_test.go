@@ -1,4 +1,4 @@
-package awsiamidc
+package awsidc
 
 import (
 	"testing"
@@ -6,6 +6,7 @@ import (
 	"github.com/abjrcode/swervo/clients/awssso"
 	"github.com/abjrcode/swervo/favorites"
 	"github.com/abjrcode/swervo/internal/app"
+	"github.com/abjrcode/swervo/internal/eventing"
 	"github.com/abjrcode/swervo/internal/migrations"
 	"github.com/abjrcode/swervo/internal/security/vault"
 	"github.com/abjrcode/swervo/internal/testhelpers"
@@ -48,19 +49,21 @@ func (m *mockAwsSsoOidcClient) GetRoleCredentials(ctx app.Context, region awssso
 }
 
 func initController(t *testing.T) (*AwsIdentityCenterController, *mockAwsSsoOidcClient, *testhelpers.MockClock) {
-	db, err := migrations.NewInMemoryMigratedDatabase(t, "aws-iam-idc-controller-tests.db")
+	db, err := migrations.NewInMemoryMigratedDatabase(t, "aws-idc-controller-tests.db")
 	require.NoError(t, err)
 
 	awsClient := new(mockAwsSsoOidcClient)
 	mockDatetime := testhelpers.NewMockClock()
 
+	bus := eventing.NewEventbus(db, mockDatetime)
+
 	favoritesRepo := favorites.NewFavorites(db)
 
-	vault := vault.NewVault(db, mockDatetime)
+	vault := vault.NewVault(db, bus, mockDatetime)
 	timeSetCall := mockDatetime.On("NowUnix").Return(1)
 	err = vault.Configure(testhelpers.NewMockAppContext(), "abc")
 	require.NoError(t, err)
-	controller := NewAwsIdentityCenterController(db, favoritesRepo, vault, awsClient, mockDatetime)
+	controller := NewAwsIdentityCenterController(db, bus, favoritesRepo, vault, awsClient, mockDatetime)
 
 	timeSetCall.Unset()
 
@@ -87,7 +90,7 @@ func simulateSuccessfulSetup(t *testing.T, controller *AwsIdentityCenterControll
 	ctx := testhelpers.NewMockAppContext()
 
 	mockTimeProvider.On("NowUnix").Once().Return(1)
-	setupResult, err := controller.Setup(ctx, AwsIamIdc_SetupCommandInput{
+	setupResult, err := controller.Setup(ctx, AwsIdc_SetupCommandInput{
 		StartUrl:  startUrl,
 		AwsRegion: region,
 		Label:     label,
@@ -106,7 +109,7 @@ func simulateSuccessfulSetup(t *testing.T, controller *AwsIdentityCenterControll
 	tokenCreatedAt := 2
 	timeSetCall := mockTimeProvider.On("NowUnix").Return(tokenCreatedAt)
 
-	instanceId, err := controller.FinalizeSetup(ctx, AwsIamIdc_FinalizeSetupCommandInput{
+	instanceId, err := controller.FinalizeSetup(ctx, AwsIdc_FinalizeSetupCommandInput{
 		ClientId:   setupResult.ClientId,
 		StartUrl:   setupResult.StartUrl,
 		AwsRegion:  setupResult.Region,
@@ -127,7 +130,7 @@ func simulateSuccessfulSetup(t *testing.T, controller *AwsIdentityCenterControll
 func TestNewAccountSetupErrorInvalidStartUrl(t *testing.T) {
 	controller, _, _ := initController(t)
 
-	_, err := controller.Setup(testhelpers.NewMockAppContext(), AwsIamIdc_SetupCommandInput{
+	_, err := controller.Setup(testhelpers.NewMockAppContext(), AwsIdc_SetupCommandInput{
 		StartUrl:  "test-account-id",
 		AwsRegion: "eu-west-1",
 		Label:     "test-label"})
@@ -138,7 +141,7 @@ func TestNewAccountSetupErrorInvalidStartUrl(t *testing.T) {
 func TestNewAccountSetupErrorInvalidRegion(t *testing.T) {
 	controller, _, _ := initController(t)
 
-	_, err := controller.Setup(testhelpers.NewMockAppContext(), AwsIamIdc_SetupCommandInput{
+	_, err := controller.Setup(testhelpers.NewMockAppContext(), AwsIdc_SetupCommandInput{
 		StartUrl:  "https://test-start-url.aws-apps.com/start",
 		AwsRegion: "region_mars",
 		Label:     "test-label"})
@@ -149,7 +152,7 @@ func TestNewAccountSetupErrorInvalidRegion(t *testing.T) {
 func TestNewAccountSetup_Error_InvalidLabel(t *testing.T) {
 	controller, _, _ := initController(t)
 
-	_, err := controller.Setup(testhelpers.NewMockAppContext(), AwsIamIdc_SetupCommandInput{
+	_, err := controller.Setup(testhelpers.NewMockAppContext(), AwsIdc_SetupCommandInput{
 		StartUrl:  "https://test-start-url.aws-apps.com/start",
 		AwsRegion: "eu-west-1",
 		Label:     "i_am_a_very_long_label_that_is_longer_than_50_characters_and_therefore_invalid"})
@@ -174,7 +177,7 @@ func TestNewAccountSetup_Error_AwsInvalidRequest(t *testing.T) {
 
 	mockAws.On("StartDeviceAuthorization").Return(nil, awssso.ErrInvalidRequest)
 
-	_, err := controller.Setup(testhelpers.NewMockAppContext(), AwsIamIdc_SetupCommandInput{
+	_, err := controller.Setup(testhelpers.NewMockAppContext(), AwsIdc_SetupCommandInput{
 		StartUrl:  startUrl,
 		AwsRegion: region,
 		Label:     label,
@@ -207,7 +210,7 @@ func TestNewAccount_FullSetup_Success(t *testing.T) {
 
 	ctx := testhelpers.NewMockAppContext()
 
-	setupResult, err := controller.Setup(ctx, AwsIamIdc_SetupCommandInput{
+	setupResult, err := controller.Setup(ctx, AwsIdc_SetupCommandInput{
 		StartUrl:  startUrl,
 		AwsRegion: region,
 		Label:     label,
@@ -225,7 +228,9 @@ func TestNewAccount_FullSetup_Success(t *testing.T) {
 
 	mockTimeProvider.On("NowUnix").Return(1)
 
-	instanceId, err := controller.FinalizeSetup(ctx, AwsIamIdc_FinalizeSetupCommandInput{
+	ch := controller.bus.Subscribe(AwsIdcEventSource)
+
+	instanceId, err := controller.FinalizeSetup(ctx, AwsIdc_FinalizeSetupCommandInput{
 		ClientId:   setupResult.ClientId,
 		StartUrl:   setupResult.StartUrl,
 		AwsRegion:  setupResult.Region,
@@ -246,6 +251,15 @@ func TestNewAccount_FullSetup_Success(t *testing.T) {
 		ExpiresIn:       5,
 		VerificationUri: "https://test-verification-url",
 	})
+
+	event := <-ch
+
+	require.Equal(t, AwsIdcInstanceCreatedEvent{
+		InstanceId: instanceId,
+		StartUrl:   startUrl,
+		Region:     region,
+		Label:      label,
+	}, event.Data)
 }
 
 func TestNewAccountSetupErrorDoubleRegistration(t *testing.T) {
@@ -259,7 +273,7 @@ func TestNewAccountSetupErrorDoubleRegistration(t *testing.T) {
 
 	_ = simulateSuccessfulSetup(t, controller, mockAws, mockTimeProvider, startUrl, region, label)
 
-	_, err := controller.Setup(ctx, AwsIamIdc_SetupCommandInput{
+	_, err := controller.Setup(ctx, AwsIdc_SetupCommandInput{
 		StartUrl:  startUrl,
 		AwsRegion: region,
 		Label:     label,
@@ -276,7 +290,7 @@ func TestFinalizeSetup_Error_InvalidStartUrl(t *testing.T) {
 
 	ctx := testhelpers.NewMockAppContext()
 
-	_, err := controller.Setup(ctx, AwsIamIdc_SetupCommandInput{
+	_, err := controller.Setup(ctx, AwsIdc_SetupCommandInput{
 		StartUrl:  startUrl,
 		AwsRegion: region,
 		Label:     label,
@@ -293,7 +307,7 @@ func TestFinalizeSetup_Error_InvalidRegion(t *testing.T) {
 
 	ctx := testhelpers.NewMockAppContext()
 
-	_, err := controller.Setup(ctx, AwsIamIdc_SetupCommandInput{
+	_, err := controller.Setup(ctx, AwsIdc_SetupCommandInput{
 		StartUrl:  startUrl,
 		AwsRegion: region,
 		Label:     label,
@@ -310,7 +324,7 @@ func TestFinalizeSetup_Error_InvalidLabel(t *testing.T) {
 
 	ctx := testhelpers.NewMockAppContext()
 
-	_, err := controller.Setup(ctx, AwsIamIdc_SetupCommandInput{
+	_, err := controller.Setup(ctx, AwsIdc_SetupCommandInput{
 		StartUrl:  startUrl,
 		AwsRegion: region,
 		Label:     label,
@@ -344,7 +358,7 @@ func TestFinalizeSetup_ErrorLoginTimeout(t *testing.T) {
 
 	ctx := testhelpers.NewMockAppContext()
 
-	setupResult, err := controller.Setup(ctx, AwsIamIdc_SetupCommandInput{
+	setupResult, err := controller.Setup(ctx, AwsIdc_SetupCommandInput{
 		StartUrl:  startUrl,
 		AwsRegion: region,
 		Label:     "test_label",
@@ -353,7 +367,7 @@ func TestFinalizeSetup_ErrorLoginTimeout(t *testing.T) {
 
 	mockAws.On("CreateToken").Return(nil, awssso.ErrDeviceCodeExpired)
 
-	_, err = controller.FinalizeSetup(ctx, AwsIamIdc_FinalizeSetupCommandInput{
+	_, err = controller.FinalizeSetup(ctx, AwsIdc_FinalizeSetupCommandInput{
 		ClientId:   setupResult.ClientId,
 		StartUrl:   setupResult.StartUrl,
 		AwsRegion:  setupResult.Region,
@@ -390,7 +404,7 @@ func TestFinalizeSetup_Error_UserDidNotAuthorizeDevice(t *testing.T) {
 
 	ctx := testhelpers.NewMockAppContext()
 
-	setupResult, err := controller.Setup(ctx, AwsIamIdc_SetupCommandInput{
+	setupResult, err := controller.Setup(ctx, AwsIdc_SetupCommandInput{
 		StartUrl:  startUrl,
 		AwsRegion: region,
 		Label:     label,
@@ -401,7 +415,7 @@ func TestFinalizeSetup_Error_UserDidNotAuthorizeDevice(t *testing.T) {
 
 	mockTimeProvider.On("NowUnix").Return(1)
 
-	_, err = controller.FinalizeSetup(ctx, AwsIamIdc_FinalizeSetupCommandInput{
+	_, err = controller.FinalizeSetup(ctx, AwsIdc_FinalizeSetupCommandInput{
 		ClientId:   setupResult.ClientId,
 		StartUrl:   setupResult.StartUrl,
 		AwsRegion:  setupResult.Region,
@@ -438,7 +452,7 @@ func TestFinalizeSetup_Error_DeviceAuthTimeout(t *testing.T) {
 
 	ctx := testhelpers.NewMockAppContext()
 
-	setupResult, err := controller.Setup(ctx, AwsIamIdc_SetupCommandInput{
+	setupResult, err := controller.Setup(ctx, AwsIdc_SetupCommandInput{
 		StartUrl:  startUrl,
 		AwsRegion: region,
 		Label:     label,
@@ -449,7 +463,7 @@ func TestFinalizeSetup_Error_DeviceAuthTimeout(t *testing.T) {
 
 	mockTimeProvider.On("NowUnix").Return(1)
 
-	_, err = controller.FinalizeSetup(ctx, AwsIamIdc_FinalizeSetupCommandInput{
+	_, err = controller.FinalizeSetup(ctx, AwsIdc_FinalizeSetupCommandInput{
 		ClientId:   setupResult.ClientId,
 		StartUrl:   setupResult.StartUrl,
 		AwsRegion:  setupResult.Region,
@@ -485,7 +499,7 @@ func TestListInstances(t *testing.T) {
 	mockAws.On("StartDeviceAuthorization").Once().Return(&mockAuthRes, nil)
 
 	mockTimeProvider.On("NowUnix").Once().Return(2)
-	setupResult, err := controller.Setup(ctx, AwsIamIdc_SetupCommandInput{
+	setupResult, err := controller.Setup(ctx, AwsIdc_SetupCommandInput{
 		StartUrl:  startUrl2,
 		AwsRegion: region2,
 		Label:     label2,
@@ -502,9 +516,9 @@ func TestListInstances(t *testing.T) {
 	mockAws.On("CreateToken").Once().Return(&mockTokenRes, nil)
 
 	tokenCreatedAt := 3
-	mockTimeProvider.On("NowUnix").Once().Return(tokenCreatedAt)
+	mockTimeProvider.On("NowUnix").Twice().Return(tokenCreatedAt)
 
-	instanceId2, err := controller.FinalizeSetup(ctx, AwsIamIdc_FinalizeSetupCommandInput{
+	instanceId2, err := controller.FinalizeSetup(ctx, AwsIdc_FinalizeSetupCommandInput{
 		ClientId:   setupResult.ClientId,
 		StartUrl:   setupResult.StartUrl,
 		AwsRegion:  setupResult.Region,
@@ -612,7 +626,7 @@ func TestGetRoleCredentials(t *testing.T) {
 
 	ctx := testhelpers.NewMockAppContext()
 
-	roleCredentials, err := controller.GetRoleCredentials(ctx, AwsIamIdc_GetRoleCredentialsCommandInput{
+	roleCredentials, err := controller.GetRoleCredentials(ctx, AwsIdc_GetRoleCredentialsCommandInput{
 		InstanceId: instanceId,
 		AccountId:  accountId,
 		RoleName:   roleName,
@@ -818,7 +832,7 @@ func TestFinalizeRefreshAccessToken(t *testing.T) {
 	}
 	mockAws.On("CreateToken").Return(&mockTokenRes, nil)
 
-	err = controller.FinalizeRefreshAccessToken(ctx, AwsIamIdc_FinalizeRefreshAccessTokenCommandInput{
+	err = controller.FinalizeRefreshAccessToken(ctx, AwsIdc_FinalizeRefreshAccessTokenCommandInput{
 		InstanceId: instanceId,
 		Region:     region,
 		UserCode:   refreshRes.UserCode,
@@ -868,7 +882,7 @@ func TestFinalizeRefreshAccessToken_InstanceDoesNotExist(t *testing.T) {
 	mockAws.On("CreateToken").Return(nil, awssso.ErrDeviceCodeExpired)
 
 	incorrectInstanceId := "well-if-u-can-find-me-it-sucks"
-	err = controller.FinalizeRefreshAccessToken(ctx, AwsIamIdc_FinalizeRefreshAccessTokenCommandInput{
+	err = controller.FinalizeRefreshAccessToken(ctx, AwsIdc_FinalizeRefreshAccessTokenCommandInput{
 		InstanceId: incorrectInstanceId,
 		Region:     region,
 		UserCode:   refreshRes.UserCode,
@@ -902,7 +916,7 @@ func TestFinalizeRefreshAccessToken_DeviceNotAuthorizedByUser(t *testing.T) {
 
 	mockAws.On("CreateToken").Return(nil, awssso.ErrDeviceFlowNotAuthorized)
 
-	err = controller.FinalizeRefreshAccessToken(ctx, AwsIamIdc_FinalizeRefreshAccessTokenCommandInput{
+	err = controller.FinalizeRefreshAccessToken(ctx, AwsIdc_FinalizeRefreshAccessTokenCommandInput{
 		InstanceId: instanceId,
 		Region:     refreshRes.Region,
 		UserCode:   refreshRes.UserCode,
@@ -936,7 +950,7 @@ func TestFinalizeRefreshAccessToken_DeviceAuthTimeout(t *testing.T) {
 
 	mockAws.On("CreateToken").Return(nil, awssso.ErrDeviceCodeExpired)
 
-	err = controller.FinalizeRefreshAccessToken(ctx, AwsIamIdc_FinalizeRefreshAccessTokenCommandInput{
+	err = controller.FinalizeRefreshAccessToken(ctx, AwsIdc_FinalizeRefreshAccessTokenCommandInput{
 		InstanceId: instanceId,
 		Region:     region,
 		UserCode:   refreshRes.UserCode,
@@ -970,7 +984,7 @@ func TestAwsClientExpires(t *testing.T) {
 
 	ctx := testhelpers.NewMockAppContext()
 
-	_, err := controller.Setup(ctx, AwsIamIdc_SetupCommandInput{
+	_, err := controller.Setup(ctx, AwsIdc_SetupCommandInput{
 		StartUrl:  startUrl,
 		AwsRegion: region,
 		Label:     label,
@@ -998,7 +1012,7 @@ func TestAwsClientExpires(t *testing.T) {
 	}
 	mockAws.On("StartDeviceAuthorization").Return(&mockAuthRes, nil)
 
-	_, err = controller.Setup(ctx, AwsIamIdc_SetupCommandInput{
+	_, err = controller.Setup(ctx, AwsIdc_SetupCommandInput{
 		StartUrl:  startUrl,
 		AwsRegion: region,
 		Label:     label,

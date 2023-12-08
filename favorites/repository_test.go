@@ -16,7 +16,7 @@ func TestAddFavorite(t *testing.T) {
 	repo := NewFavorites(db)
 
 	favorite := &Favorite{
-		ProviderCode: providers.AwsIamIdc,
+		ProviderCode: providers.AwsIdc,
 		InstanceId:   "some-nice-id",
 	}
 
@@ -39,7 +39,7 @@ func TestRemoveFavorite(t *testing.T) {
 	ctx := testhelpers.NewMockAppContext()
 
 	favorite := &Favorite{
-		ProviderCode: providers.AwsIamIdc,
+		ProviderCode: providers.AwsIdc,
 		InstanceId:   "some-nice-id",
 	}
 
@@ -69,7 +69,7 @@ func TestIsFavorite(t *testing.T) {
 	ctx := testhelpers.NewMockAppContext()
 
 	favorite := &Favorite{
-		ProviderCode: providers.AwsIamIdc,
+		ProviderCode: providers.AwsIdc,
 		InstanceId:   "some-nice-id",
 	}
 
@@ -81,7 +81,7 @@ func TestIsFavorite(t *testing.T) {
 	require.True(t, isFavorite)
 
 	isFavorite, err = repo.IsFavorite(ctx, &Favorite{
-		ProviderCode: providers.AwsIamIdc,
+		ProviderCode: providers.AwsIdc,
 		InstanceId:   "some-nice-id-2",
 	})
 	require.NoError(t, err)

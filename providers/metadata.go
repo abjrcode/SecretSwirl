@@ -7,14 +7,14 @@ type ProviderMeta struct {
 }
 
 var (
-	AwsIamIdc = "aws-iam-idc"
+	AwsIdc = "aws-idc"
 )
 
 var (
 	SupportedProviders = map[string]ProviderMeta{
-		AwsIamIdc: {
-			Code: AwsIamIdc,
-			Name: "AWS IAM IDC",
+		AwsIdc: {
+			Code: AwsIdc,
+			Name: "AWS Identity Center",
 		},
 	}
 )
