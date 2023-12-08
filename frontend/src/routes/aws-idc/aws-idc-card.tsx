@@ -1,20 +1,17 @@
 import React from "react"
 import { useFetcher, useNavigate, useRevalidator } from "react-router-dom"
 
-import {
-  AwsIamIdcCardDataError,
-  AwsIamIdcCardDataResult,
-} from "./aws-iam-idc-card-data"
+import { AwsIdcCardDataError, AwsIdcCardDataResult } from "./aws-idc-card-data"
 import { useWails } from "../../wails-provider/wails-context"
 import { useToaster } from "../../toast-provider/toast-context"
 import {
-  AwsIamIdc_GetRoleCredentials,
-  AwsIamIdc_MarkAsFavorite,
-  AwsIamIdc_RefreshAccessToken,
-  AwsIamIdc_UnmarkAsFavorite,
+  AwsIdc_GetRoleCredentials,
+  AwsIdc_MarkAsFavorite,
+  AwsIdc_RefreshAccessToken,
+  AwsIdc_UnmarkAsFavorite,
 } from "../../utils/ipc-adapter"
 
-export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
+export function AwsIdcCard({ instanceId }: { instanceId: string }) {
   const wails = useWails()
   const toaster = useToaster()
   const navigate = useNavigate()
@@ -22,9 +19,9 @@ export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
   const validator = useRevalidator()
 
   async function authorizeDevice(instanceId: string) {
-    const deviceAuthFlowResult = await AwsIamIdc_RefreshAccessToken(instanceId)
+    const deviceAuthFlowResult = await AwsIdc_RefreshAccessToken(instanceId)
 
-    navigate("/providers/aws-iam-idc/device-auth", {
+    navigate("/providers/aws-idc/device-auth", {
       state: {
         action: "refresh",
         instanceId: deviceAuthFlowResult.instanceId,
@@ -44,7 +41,7 @@ export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
       const urlSearchParams = new URLSearchParams()
       urlSearchParams.append("instanceId", instanceId)
       urlSearchParams.append("refresh", "false")
-      fetcher.load(`/internal/api/aws-iam-idc-card?${urlSearchParams.toString()}`)
+      fetcher.load(`/internal/api/aws-idc-card?${urlSearchParams.toString()}`)
     }
   }, [instanceId, fetcher])
 
@@ -53,16 +50,16 @@ export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
     urlSearchParams.append("instanceId", instanceId)
     urlSearchParams.append("refresh", "true")
 
-    fetcher.load(`/internal/api/aws-iam-idc-card?${urlSearchParams.toString()}`)
+    fetcher.load(`/internal/api/aws-idc-card?${urlSearchParams.toString()}`)
   }
 
   async function markAsFavorite() {
-    await AwsIamIdc_MarkAsFavorite(instanceId)
+    await AwsIdc_MarkAsFavorite(instanceId)
     validator.revalidate()
   }
 
   async function unmarkAsFavorite() {
-    await AwsIamIdc_UnmarkAsFavorite(instanceId)
+    await AwsIdc_UnmarkAsFavorite(instanceId)
     validator.revalidate()
   }
 
@@ -71,7 +68,7 @@ export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
     accountId: string,
     roleName: string,
   ) {
-    const output = await AwsIamIdc_GetRoleCredentials({
+    const output = await AwsIdc_GetRoleCredentials({
       instanceId,
       accountId,
       roleName,
@@ -86,7 +83,7 @@ export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
     toaster.showSuccess("Copied credentials to clipboard!")
   }
 
-  const cardDataResult = fetcher.data as AwsIamIdcCardDataResult | undefined
+  const cardDataResult = fetcher.data as AwsIdcCardDataResult | undefined
 
   if (cardDataResult === undefined) {
     return (
@@ -211,13 +208,13 @@ export function AwsIamIdcCard({ instanceId }: { instanceId: string }) {
   }
 
   switch (cardDataResult.code) {
-    case AwsIamIdcCardDataError.ErrTransientAwsClientError:
+    case AwsIdcCardDataError.ErrTransientAwsClientError:
       return (
         <div className="card gap-6 px-6 py-4 card-bordered border-secondary bg-base-200 drop-shadow-lg">
           <div
             role="heading"
             className="card-title justify-between">
-            <h1 className="text-2xl font-semibold">AWS IAM Identity Center</h1>
+            <h1 className="text-2xl font-semibold">AWS Identity Center</h1>
           </div>
           <div className="card-body">
             <h2 className="text-xl">
