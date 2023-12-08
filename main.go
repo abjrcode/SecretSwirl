@@ -13,6 +13,7 @@ import (
 	"github.com/abjrcode/swervo/favorites"
 	"github.com/abjrcode/swervo/internal/app"
 	"github.com/abjrcode/swervo/internal/datastore"
+	"github.com/abjrcode/swervo/internal/eventing"
 	"github.com/abjrcode/swervo/internal/migrations"
 	"github.com/abjrcode/swervo/internal/security/vault"
 	"github.com/abjrcode/swervo/internal/utils"
@@ -91,8 +92,11 @@ func main() {
 
 	}
 
-	timeProvider := utils.NewClock()
-	vault := vault.NewVault(db, timeProvider)
+	clock := utils.NewClock()
+
+	eventBus := eventing.NewEventbus(db, clock)
+
+	vault := vault.NewVault(db, eventBus, clock)
 	defer vault.Seal()
 
 	authController := NewAuthController(vault)
@@ -100,7 +104,7 @@ func main() {
 	favoritesRepo := favorites.NewFavorites(db)
 	dashboardController := NewDashboardController(favoritesRepo)
 
-	awsIdcController := awsiamidc.NewAwsIdentityCenterController(db, favoritesRepo, vault, awssso.NewAwsSsoOidcClient(), timeProvider)
+	awsIdcController := awsiamidc.NewAwsIdentityCenterController(db, eventBus, favoritesRepo, vault, awssso.NewAwsSsoOidcClient(), clock)
 
 	appController := &AppController{
 		authController:      authController,

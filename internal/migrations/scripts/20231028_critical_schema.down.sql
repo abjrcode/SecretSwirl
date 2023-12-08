@@ -1,3 +1,2 @@
-DROP TABLE "providers";
-
-DROP TABLE "argon_key_material";
+DROP TABLE "vault";
+DROP TABLE "event_log";
