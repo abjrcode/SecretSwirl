@@ -1,4 +1,4 @@
-package awsiamidc
+package awsidc
 
 import (
 	"bytes"
@@ -129,7 +129,7 @@ func (c *AwsIdentityCenterController) GetInstanceData(ctx app.Context, instanceI
 	}
 
 	isFavorite, err := c.favoritesRepo.IsFavorite(ctx, &favorites.Favorite{
-		ProviderCode: providers.AwsIamIdc,
+		ProviderCode: providers.AwsIdc,
 		InstanceId:   instanceId,
 	})
 
@@ -236,13 +236,13 @@ func (c *AwsIdentityCenterController) GetInstanceData(ctx app.Context, instanceI
 	}, nil
 }
 
-type AwsIamIdc_GetRoleCredentialsCommandInput struct {
+type AwsIdc_GetRoleCredentialsCommandInput struct {
 	InstanceId string `json:"instanceId"`
 	AccountId  string `json:"accountId"`
 	RoleName   string `json:"roleName"`
 }
 
-func (c *AwsIdentityCenterController) GetRoleCredentials(ctx app.Context, input AwsIamIdc_GetRoleCredentialsCommandInput) (*AwsIdentityCenterAccountRoleCredentials, error) {
+func (c *AwsIdentityCenterController) GetRoleCredentials(ctx app.Context, input AwsIdc_GetRoleCredentialsCommandInput) (*AwsIdentityCenterAccountRoleCredentials, error) {
 	row := c.db.QueryRowContext(ctx, "SELECT region, access_token_enc, access_token_created_at, access_token_expires_in, enc_key_id FROM aws_idc WHERE instance_id = ?", input.InstanceId)
 
 	var region string
@@ -318,13 +318,13 @@ type AuthorizeDeviceFlowResult struct {
 	DeviceCode      string `json:"deviceCode"`
 }
 
-type AwsIamIdc_SetupCommandInput struct {
+type AwsIdc_SetupCommandInput struct {
 	StartUrl  string `json:"startUrl"`
 	AwsRegion string `json:"awsRegion"`
 	Label     string `json:"label"`
 }
 
-func (c *AwsIdentityCenterController) Setup(ctx app.Context, input AwsIamIdc_SetupCommandInput) (*AuthorizeDeviceFlowResult, error) {
+func (c *AwsIdentityCenterController) Setup(ctx app.Context, input AwsIdc_SetupCommandInput) (*AuthorizeDeviceFlowResult, error) {
 	if err := c.validateStartUrl(input.StartUrl); err != nil {
 		return nil, err
 	}
@@ -389,7 +389,7 @@ func (c *AwsIdentityCenterController) Setup(ctx app.Context, input AwsIamIdc_Set
 	}, nil
 }
 
-type AwsIamIdc_FinalizeSetupCommandInput struct {
+type AwsIdc_FinalizeSetupCommandInput struct {
 	ClientId   string `json:"clientId"`
 	StartUrl   string `json:"startUrl"`
 	AwsRegion  string `json:"awsRegion"`
@@ -398,7 +398,7 @@ type AwsIamIdc_FinalizeSetupCommandInput struct {
 	DeviceCode string `json:"deviceCode"`
 }
 
-func (c *AwsIdentityCenterController) FinalizeSetup(ctx app.Context, input AwsIamIdc_FinalizeSetupCommandInput) (string, error) {
+func (c *AwsIdentityCenterController) FinalizeSetup(ctx app.Context, input AwsIdc_FinalizeSetupCommandInput) (string, error) {
 	if err := c.validateLabel(input.Label); err != nil {
 		return "", err
 	}
@@ -497,14 +497,14 @@ func (c *AwsIdentityCenterController) FinalizeSetup(ctx app.Context, input AwsIa
 
 func (c *AwsIdentityCenterController) MarkAsFavorite(ctx app.Context, instanceId string) error {
 	return c.favoritesRepo.Add(ctx, &favorites.Favorite{
-		ProviderCode: providers.AwsIamIdc,
+		ProviderCode: providers.AwsIdc,
 		InstanceId:   instanceId,
 	})
 }
 
 func (c *AwsIdentityCenterController) UnmarkAsFavorite(ctx app.Context, instanceId string) error {
 	return c.favoritesRepo.Remove(ctx, &favorites.Favorite{
-		ProviderCode: providers.AwsIamIdc,
+		ProviderCode: providers.AwsIdc,
 		InstanceId:   instanceId,
 	})
 }
@@ -550,14 +550,14 @@ func (c *AwsIdentityCenterController) RefreshAccessToken(ctx app.Context, instan
 	}, nil
 }
 
-type AwsIamIdc_FinalizeRefreshAccessTokenCommandInput struct {
+type AwsIdc_FinalizeRefreshAccessTokenCommandInput struct {
 	InstanceId string `json:"instanceId"`
 	Region     string `json:"region"`
 	UserCode   string `json:"userCode"`
 	DeviceCode string `json:"deviceCode"`
 }
 
-func (c *AwsIdentityCenterController) FinalizeRefreshAccessToken(ctx app.Context, input AwsIamIdc_FinalizeRefreshAccessTokenCommandInput) error {
+func (c *AwsIdentityCenterController) FinalizeRefreshAccessToken(ctx app.Context, input AwsIdc_FinalizeRefreshAccessTokenCommandInput) error {
 	if err := c.validateAwsRegion(input.Region); err != nil {
 		return err
 	}
