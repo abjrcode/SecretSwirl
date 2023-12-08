@@ -10,6 +10,7 @@ import (
 	"io"
 
 	"github.com/abjrcode/swervo/internal/app"
+	"github.com/abjrcode/swervo/internal/eventing"
 	"github.com/abjrcode/swervo/internal/security/encryption"
 	"github.com/abjrcode/swervo/internal/utils"
 	"github.com/awnumar/memguard"
@@ -21,6 +22,10 @@ var (
 	ErrVaultNotConfigured         = errors.New("vault is not configured")
 	ErrVaultNotConfiguredOrSealed = errors.New("vault is not configured or sealed")
 )
+
+type VaultConfiguredEvent struct {
+	KeyId string
+}
 
 type Vault interface {
 	// IsConfigured returns true if the vault is configured with a key, false otherwise.
@@ -43,21 +48,23 @@ type Vault interface {
 type vaultImpl struct {
 	timeSvc       utils.Clock
 	db            *sql.DB
+	bus           *eventing.Eventbus
 	keyId         *string
 	encryptionKey *memguard.Enclave
 }
 
-func NewVault(db *sql.DB, timeSvc utils.Clock) Vault {
+func NewVault(db *sql.DB, bus *eventing.Eventbus, timeSvc utils.Clock) Vault {
 	memguard.CatchInterrupt()
 
 	return &vaultImpl{
 		timeSvc: timeSvc,
 		db:      db,
+		bus:     bus,
 	}
 }
 
 func (v *vaultImpl) IsConfigured(ctx app.Context) (bool, error) {
-	row := v.db.QueryRowContext(ctx, `SELECT "key_id" FROM "argon_key_material";`)
+	row := v.db.QueryRowContext(ctx, `SELECT "key_id" FROM "argon_keys";`)
 
 	var keyId string
 
@@ -102,9 +109,18 @@ func (v *vaultImpl) Configure(ctx app.Context, plainPassword string) error {
 
 	encKeyHash := sha3_512Hash(derivedKey)
 
-	_, err = v.db.ExecContext(ctx, `
-	INSERT INTO "argon_key_material" (
+	tx, err := v.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	version := 1
+
+	_, err = tx.ExecContext(ctx, `
+	INSERT INTO "argon_keys" (
 		"key_id",
+		"version",
 		"key_hash_sha3_512",
 		"argon2_version",
 		"argon2_variant",
@@ -126,8 +142,9 @@ func (v *vaultImpl) Configure(ctx app.Context, plainPassword string) error {
 		?,
 		?,
 		?,
+		?,
 		?
-	);`, keyId, encKeyHash,
+	);`, keyId, version, encKeyHash,
 		DefaultParameters.Aargon2Version, DefaultParameters.Variant,
 		v.timeSvc.NowUnix(), DefaultParameters.Memory,
 		DefaultParameters.Iterations, DefaultParameters.Parallelism,
@@ -137,6 +154,24 @@ func (v *vaultImpl) Configure(ctx app.Context, plainPassword string) error {
 	if err != nil {
 		return err
 	}
+
+	publish, err := v.bus.PublishTx(ctx, VaultConfiguredEvent{
+		KeyId: keyId,
+	}, eventing.EventMeta{
+		SourceType:   "Vault",
+		SourceId:     keyId,
+		EventVersion: uint64(version),
+	}, tx)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	publish()
 
 	v.keyId = &keyId
 	v.encryptionKey = memguard.NewEnclave(derivedKey)
@@ -165,7 +200,7 @@ func (v *vaultImpl) Open(ctx app.Context, plainPassword string) (bool, error) {
 		"salt_length",
 		"salt_base64",
 		"key_length"
-	FROM "argon_key_material";`)
+	FROM "argon_keys";`)
 
 	var keyId string
 	var keyHash []byte
