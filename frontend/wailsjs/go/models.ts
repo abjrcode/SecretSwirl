@@ -1,4 +1,4 @@
-export namespace awsiamidc {
+export namespace awsidc {
 	
 	export class AuthorizeDeviceFlowResult {
 	    instanceId: string;
@@ -28,14 +28,14 @@ export namespace awsiamidc {
 	        this.deviceCode = source["deviceCode"];
 	    }
 	}
-	export class AwsIamIdc_FinalizeRefreshAccessTokenCommandInput {
+	export class AwsIdc_FinalizeRefreshAccessTokenCommandInput {
 	    instanceId: string;
 	    region: string;
 	    userCode: string;
 	    deviceCode: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new AwsIamIdc_FinalizeRefreshAccessTokenCommandInput(source);
+	        return new AwsIdc_FinalizeRefreshAccessTokenCommandInput(source);
 	    }
 	
 	    constructor(source: any = {}) {
@@ -46,7 +46,7 @@ export namespace awsiamidc {
 	        this.deviceCode = source["deviceCode"];
 	    }
 	}
-	export class AwsIamIdc_FinalizeSetupCommandInput {
+	export class AwsIdc_FinalizeSetupCommandInput {
 	    clientId: string;
 	    startUrl: string;
 	    awsRegion: string;
@@ -55,7 +55,7 @@ export namespace awsiamidc {
 	    deviceCode: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new AwsIamIdc_FinalizeSetupCommandInput(source);
+	        return new AwsIdc_FinalizeSetupCommandInput(source);
 	    }
 	
 	    constructor(source: any = {}) {
@@ -68,13 +68,13 @@ export namespace awsiamidc {
 	        this.deviceCode = source["deviceCode"];
 	    }
 	}
-	export class AwsIamIdc_GetRoleCredentialsCommandInput {
+	export class AwsIdc_GetRoleCredentialsCommandInput {
 	    instanceId: string;
 	    accountId: string;
 	    roleName: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new AwsIamIdc_GetRoleCredentialsCommandInput(source);
+	        return new AwsIdc_GetRoleCredentialsCommandInput(source);
 	    }
 	
 	    constructor(source: any = {}) {
@@ -84,13 +84,13 @@ export namespace awsiamidc {
 	        this.roleName = source["roleName"];
 	    }
 	}
-	export class AwsIamIdc_SetupCommandInput {
+	export class AwsIdc_SetupCommandInput {
 	    startUrl: string;
 	    awsRegion: string;
 	    label: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new AwsIamIdc_SetupCommandInput(source);
+	        return new AwsIdc_SetupCommandInput(source);
 	    }
 	
 	    constructor(source: any = {}) {

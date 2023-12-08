@@ -1,7 +1,7 @@
 import { Link, useLoaderData } from "react-router-dom"
-import { AwsIamIdcCard } from "./aws-iam-idc-card"
+import { AwsIdcCard } from "./aws-idc-card"
 
-export function AwsIamIdcInstances() {
+export function AwsIdcInstances() {
   const loader = useLoaderData() as string[] | undefined
 
   if (!loader) {
@@ -10,7 +10,7 @@ export function AwsIamIdcInstances() {
 
   return (
     <div>
-      <h1 className="text-primary text-3xl">AWS IAM Identity Center Instances</h1>
+      <h1 className="text-primary text-3xl">AWS Identity Center Instances</h1>
 
       <br />
       <br />
@@ -18,7 +18,7 @@ export function AwsIamIdcInstances() {
       <ul className="flex gap-4">
         {loader.map((instance) => (
           <li key={instance}>
-            <AwsIamIdcCard instanceId={instance} />
+            <AwsIdcCard instanceId={instance} />
           </li>
         ))}
 

@@ -7,19 +7,19 @@ import { createHashRouter, RouterProvider } from "react-router-dom"
 import { Dashboard } from "./routes/dashboard/dashboard"
 import { dashboardLoader } from "./routes/dashboard/dashboard-data"
 import { providersLoader } from "./routes/providers/providers-data"
-import { awsIamIdcCardLoader } from "./routes/aws-iam-idc/aws-iam-idc-card-data"
+import { awsIdcCardLoader } from "./routes/aws-idc/aws-idc-card-data"
 import { Providers } from "./routes/providers/providers"
-import { AwsIamIdcSetup } from "./routes/aws-iam-idc/aws-iam-idc-setup"
-import { awsIamIdcSetupAction } from "./routes/aws-iam-idc/aws-iam-idc-setup-data"
+import { AwsIdcSetup } from "./routes/aws-idc/aws-idc-setup"
+import { awsIdcSetupAction } from "./routes/aws-idc/aws-idc-setup-data"
 import { Vault } from "./routes/vault/vault"
 import { AuthProvider } from "./auth-provider/auth-provider"
 import { ErrorPage } from "./error-page"
 import { WailsProvider } from "./wails-provider/wails-provider"
-import { AwsIamIdcDeviceAuth } from "./routes/aws-iam-idc/aws-iam-idc-device-auth"
-import { awsIamIdcDeviceAuthAction } from "./routes/aws-iam-idc/aws-iam-idc-device-auth-data"
+import { AwsIdcDeviceAuth } from "./routes/aws-idc/aws-idc-device-auth"
+import { awsIdcDeviceAuthAction } from "./routes/aws-idc/aws-idc-device-auth-data"
 import { ToastProvider } from "./toast-provider/toast-provider"
-import { AwsIamIdcInstances } from "./routes/aws-iam-idc/aws-iam-idc-instances"
-import { awsIamIdcInstancesData } from "./routes/aws-iam-idc/aws-iam-idc-instances-data"
+import { AwsIdcInstances } from "./routes/aws-idc/aws-idc-instances"
+import { awsIdcInstancesData } from "./routes/aws-idc/aws-idc-instances-data"
 import { Auth_IsVaultConfigured } from "./utils/ipc-adapter"
 
 const devMode = import.meta.env.DEV
@@ -47,22 +47,22 @@ void (async function main() {
           loader: providersLoader,
           children: [
             {
-              path: "aws-iam-idc",
+              path: "aws-idc",
               children: [
                 {
                   index: true,
-                  element: <AwsIamIdcInstances />,
-                  loader: awsIamIdcInstancesData,
+                  element: <AwsIdcInstances />,
+                  loader: awsIdcInstancesData,
                 },
                 {
                   path: "setup",
-                  element: <AwsIamIdcSetup />,
-                  action: awsIamIdcSetupAction,
+                  element: <AwsIdcSetup />,
+                  action: awsIdcSetupAction,
                 },
                 {
                   path: "device-auth",
-                  element: <AwsIamIdcDeviceAuth />,
-                  action: awsIamIdcDeviceAuthAction,
+                  element: <AwsIdcDeviceAuth />,
+                  action: awsIdcDeviceAuthAction,
                 },
               ],
             },
@@ -71,8 +71,8 @@ void (async function main() {
       ],
     },
     {
-      path: "/internal/api/aws-iam-idc-card",
-      loader: awsIamIdcCardLoader,
+      path: "/internal/api/aws-idc-card",
+      loader: awsIdcCardLoader,
     },
   ])
 

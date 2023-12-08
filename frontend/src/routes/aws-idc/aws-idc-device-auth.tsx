@@ -1,17 +1,17 @@
 import { Form, useActionData, useLocation, useNavigate } from "react-router-dom"
 import { ExternalLink } from "../../components/external-link"
 import {
-  AwsIamIdcDeviceAuthFlowError,
-  AwsIamIdcDeviceAuthFlowResult,
-} from "./aws-iam-idc-device-auth-data"
+  AwsIdcDeviceAuthFlowError,
+  AwsIdcDeviceAuthFlowResult,
+} from "./aws-idc-device-auth-data"
 import { useEffect, useRef } from "react"
 import { useToaster } from "../../toast-provider/toast-context"
 
-export function AwsIamIdcDeviceAuth() {
+export function AwsIdcDeviceAuth() {
   const toaster = useToaster()
   const location = useLocation()
   const navigate = useNavigate()
-  const actionData = useActionData() as AwsIamIdcDeviceAuthFlowResult | undefined
+  const actionData = useActionData() as AwsIdcDeviceAuthFlowResult | undefined
 
   const authFlowState = useRef(location.state)
 
@@ -46,28 +46,26 @@ export function AwsIamIdcDeviceAuth() {
 
     if (actionData.success === false) {
       switch (actionData.code) {
-        case AwsIamIdcDeviceAuthFlowError.ErrDeviceAuthFlowNotAuthorized:
+        case AwsIdcDeviceAuthFlowError.ErrDeviceAuthFlowNotAuthorized:
           toaster.showError(
             "You haven not authorized the device through the activation link :(\nPlease do so then click this button again",
           )
           return
-        case AwsIamIdcDeviceAuthFlowError.ErrDeviceAuthFlowTimedOut:
+        case AwsIdcDeviceAuthFlowError.ErrDeviceAuthFlowTimedOut:
           toaster.showError(
             "The device authorization flow timed out and we have to start over",
           )
           return navigate("/")
-        case AwsIamIdcDeviceAuthFlowError.ErrInvalidStartUrl:
-          toaster.showError(
-            "The Start URL is not a valid AWS IAM Identity Center URL",
-          )
+        case AwsIdcDeviceAuthFlowError.ErrInvalidStartUrl:
+          toaster.showError("The Start URL is not a valid AWS Identity Center URL")
           return
-        case AwsIamIdcDeviceAuthFlowError.ErrInvalidAwsRegion:
+        case AwsIdcDeviceAuthFlowError.ErrInvalidAwsRegion:
           toaster.showError("The AWS region is not valid")
           return
-        case AwsIamIdcDeviceAuthFlowError.ErrInvalidLabel:
+        case AwsIdcDeviceAuthFlowError.ErrInvalidLabel:
           toaster.showError("The account label must be between 1 and 50 characters")
           return
-        case AwsIamIdcDeviceAuthFlowError.ErrTransientAwsClientError:
+        case AwsIdcDeviceAuthFlowError.ErrTransientAwsClientError:
           toaster.showWarning(
             "There was an error, but it might work if you try again a bit later",
           )

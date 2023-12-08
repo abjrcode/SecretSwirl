@@ -9,7 +9,7 @@ import (
 
 	"github.com/abjrcode/swervo/internal/app"
 	"github.com/abjrcode/swervo/internal/utils"
-	awsiamidc "github.com/abjrcode/swervo/providers/aws_iam_idc"
+	awsidc "github.com/abjrcode/swervo/providers/aws_idc"
 	"github.com/rs/zerolog"
 	"github.com/wailsapp/wails/v2/pkg/menu"
 	"github.com/wailsapp/wails/v2/pkg/menu/keys"
@@ -28,7 +28,7 @@ type AppController struct {
 
 	authController      *AuthController
 	dashboardController *DashboardController
-	awsIamIdcController *awsiamidc.AwsIdentityCenterController
+	awsIdcController    *awsidc.AwsIdentityCenterController
 }
 
 func (c *AppController) Init(ctx context.Context, errorHandler app.ErrorHandler) {
@@ -132,29 +132,29 @@ func (c *AppController) RunAppCommand(command string, commandInput map[string]an
 		output = c.dashboardController.ListProviders()
 	case "Dashboard_ListFavorites":
 		output, err = c.dashboardController.ListFavorites(appContext)
-	case "AwsIamIdc_ListInstances":
-		output, err = c.awsIamIdcController.ListInstances(appContext)
-	case "AwsIamIdc_GetInstanceData":
-		output, err = c.awsIamIdcController.GetInstanceData(appContext,
+	case "AwsIdc_ListInstances":
+		output, err = c.awsIdcController.ListInstances(appContext)
+	case "AwsIdc_GetInstanceData":
+		output, err = c.awsIdcController.GetInstanceData(appContext,
 			commandInput["instanceId"].(string),
 			commandInput["forceRefresh"].(bool))
-	case "AwsIamIdc_GetRoleCredentials":
-		output, err = c.awsIamIdcController.GetRoleCredentials(appContext,
-			awsiamidc.AwsIamIdc_GetRoleCredentialsCommandInput{
+	case "AwsIdc_GetRoleCredentials":
+		output, err = c.awsIdcController.GetRoleCredentials(appContext,
+			awsidc.AwsIdc_GetRoleCredentialsCommandInput{
 				InstanceId: commandInput["instanceId"].(string),
 				AccountId:  commandInput["accountId"].(string),
 				RoleName:   commandInput["roleName"].(string),
 			})
-	case "AwsIamIdc_Setup":
-		output, err = c.awsIamIdcController.Setup(appContext,
-			awsiamidc.AwsIamIdc_SetupCommandInput{
+	case "AwsIdc_Setup":
+		output, err = c.awsIdcController.Setup(appContext,
+			awsidc.AwsIdc_SetupCommandInput{
 				StartUrl:  commandInput["startUrl"].(string),
 				AwsRegion: commandInput["awsRegion"].(string),
 				Label:     commandInput["label"].(string),
 			})
-	case "AwsIamIdc_FinalizeSetup":
-		output, err = c.awsIamIdcController.FinalizeSetup(appContext,
-			awsiamidc.AwsIamIdc_FinalizeSetupCommandInput{
+	case "AwsIdc_FinalizeSetup":
+		output, err = c.awsIdcController.FinalizeSetup(appContext,
+			awsidc.AwsIdc_FinalizeSetupCommandInput{
 				ClientId:   commandInput["clientId"].(string),
 				StartUrl:   commandInput["startUrl"].(string),
 				AwsRegion:  commandInput["awsRegion"].(string),
@@ -162,15 +162,15 @@ func (c *AppController) RunAppCommand(command string, commandInput map[string]an
 				UserCode:   commandInput["userCode"].(string),
 				DeviceCode: commandInput["deviceCode"].(string),
 			})
-	case "AwsIamIdc_MarkAsFavorite":
-		err = c.awsIamIdcController.MarkAsFavorite(appContext, commandInput["instanceId"].(string))
-	case "AwsIamIdc_UnmarkAsFavorite":
-		err = c.awsIamIdcController.UnmarkAsFavorite(appContext, commandInput["instanceId"].(string))
-	case "AwsIamIdc_RefreshAccessToken":
-		output, err = c.awsIamIdcController.RefreshAccessToken(appContext, commandInput["instanceId"].(string))
-	case "AwsIamIdc_FinalizeRefreshAccessToken":
-		err = c.awsIamIdcController.FinalizeRefreshAccessToken(appContext,
-			awsiamidc.AwsIamIdc_FinalizeRefreshAccessTokenCommandInput{
+	case "AwsIdc_MarkAsFavorite":
+		err = c.awsIdcController.MarkAsFavorite(appContext, commandInput["instanceId"].(string))
+	case "AwsIdc_UnmarkAsFavorite":
+		err = c.awsIdcController.UnmarkAsFavorite(appContext, commandInput["instanceId"].(string))
+	case "AwsIdc_RefreshAccessToken":
+		output, err = c.awsIdcController.RefreshAccessToken(appContext, commandInput["instanceId"].(string))
+	case "AwsIdc_FinalizeRefreshAccessToken":
+		err = c.awsIdcController.FinalizeRefreshAccessToken(appContext,
+			awsidc.AwsIdc_FinalizeRefreshAccessTokenCommandInput{
 				InstanceId: commandInput["instanceId"].(string),
 				Region:     commandInput["region"].(string),
 				UserCode:   commandInput["userCode"].(string),

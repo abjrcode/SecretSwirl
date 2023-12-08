@@ -13,10 +13,11 @@ import (
 	"github.com/abjrcode/swervo/favorites"
 	"github.com/abjrcode/swervo/internal/app"
 	"github.com/abjrcode/swervo/internal/datastore"
+	"github.com/abjrcode/swervo/internal/eventing"
 	"github.com/abjrcode/swervo/internal/migrations"
 	"github.com/abjrcode/swervo/internal/security/vault"
 	"github.com/abjrcode/swervo/internal/utils"
-	awsiamidc "github.com/abjrcode/swervo/providers/aws_iam_idc"
+	awsidc "github.com/abjrcode/swervo/providers/aws_idc"
 
 	_ "github.com/golang-migrate/migrate/v4/database/sqlite3"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -88,11 +89,13 @@ func main() {
 		if err := migrationRunner.RunSafe(); err != nil {
 			errorHandler.CatchWithMsg(nil, logger, err, "error when running migrations")
 		}
-
 	}
 
-	timeProvider := utils.NewClock()
-	vault := vault.NewVault(db, timeProvider)
+	clock := utils.NewClock()
+
+	eventBus := eventing.NewEventbus(db, clock)
+
+	vault := vault.NewVault(db, eventBus, clock)
 	defer vault.Seal()
 
 	authController := NewAuthController(vault)
@@ -100,12 +103,12 @@ func main() {
 	favoritesRepo := favorites.NewFavorites(db)
 	dashboardController := NewDashboardController(favoritesRepo)
 
-	awsIdcController := awsiamidc.NewAwsIdentityCenterController(db, favoritesRepo, vault, awssso.NewAwsSsoOidcClient(), timeProvider)
+	awsIdcController := awsidc.NewAwsIdentityCenterController(db, eventBus, favoritesRepo, vault, awssso.NewAwsSsoOidcClient(), clock)
 
 	appController := &AppController{
 		authController:      authController,
 		dashboardController: dashboardController,
-		awsIamIdcController: awsIdcController,
+		awsIdcController:    awsIdcController,
 	}
 
 	logger.Info().Msgf("PID [%d] - launching Swervo", os.Getpid())

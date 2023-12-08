@@ -1,8 +1,8 @@
 import { ActionFunctionArgs } from "react-router-dom"
-import { AwsIamIdc_FinalizeRefreshAccessToken, AwsIamIdc_FinalizeSetup } from "../../utils/ipc-adapter"
+import { AwsIdc_FinalizeRefreshAccessToken, AwsIdc_FinalizeSetup } from "../../utils/ipc-adapter"
 import { ActionDataResult } from "../../utils/action-data-result"
 
-export enum AwsIamIdcDeviceAuthFlowError {
+export enum AwsIdcDeviceAuthFlowError {
   ErrDeviceAuthFlowNotAuthorized = "DEVICE_AUTH_FLOW_NOT_AUTHORIZED",
   ErrDeviceAuthFlowTimedOut = "DEVICE_AUTH_FLOW_TIMED_OUT",
   ErrInvalidStartUrl = "INVALID_START_URL",
@@ -11,9 +11,9 @@ export enum AwsIamIdcDeviceAuthFlowError {
   ErrTransientAwsClientError = "TRANSIENT_AWS_CLIENT_ERROR",
 }
 
-export type AwsIamIdcDeviceAuthFlowResult = ActionDataResult<null, AwsIamIdcDeviceAuthFlowError>
+export type AwsIdcDeviceAuthFlowResult = ActionDataResult<null, AwsIdcDeviceAuthFlowError>
 
-export async function awsIamIdcDeviceAuthAction({ request }: ActionFunctionArgs): Promise<AwsIamIdcDeviceAuthFlowResult> {
+export async function awsIdcDeviceAuthAction({ request }: ActionFunctionArgs): Promise<AwsIdcDeviceAuthFlowResult> {
   const formData = await request.formData()
   const updates = Object.fromEntries(formData)
 
@@ -29,7 +29,7 @@ export async function awsIamIdcDeviceAuthAction({ request }: ActionFunctionArgs)
   try {
     switch (action) {
       case "setup":
-        await AwsIamIdc_FinalizeSetup({
+        await AwsIdc_FinalizeSetup({
           startUrl,
           awsRegion,
           label,
@@ -39,7 +39,7 @@ export async function awsIamIdcDeviceAuthAction({ request }: ActionFunctionArgs)
         })
         break;
       case "refresh":
-        await AwsIamIdc_FinalizeRefreshAccessToken({
+        await AwsIdc_FinalizeRefreshAccessToken({
           instanceId,
           region: awsRegion,
           deviceCode,
@@ -52,18 +52,18 @@ export async function awsIamIdcDeviceAuthAction({ request }: ActionFunctionArgs)
     }
   } catch (e) {
     switch (e) {
-      case AwsIamIdcDeviceAuthFlowError.ErrDeviceAuthFlowNotAuthorized:
-        return { success: false, code: AwsIamIdcDeviceAuthFlowError.ErrDeviceAuthFlowNotAuthorized, error: e }
-      case AwsIamIdcDeviceAuthFlowError.ErrDeviceAuthFlowTimedOut:
-        return { success: false, code: AwsIamIdcDeviceAuthFlowError.ErrDeviceAuthFlowTimedOut, error: e }
-      case AwsIamIdcDeviceAuthFlowError.ErrInvalidStartUrl:
-        return { success: false, code: AwsIamIdcDeviceAuthFlowError.ErrInvalidStartUrl, error: e }
-      case AwsIamIdcDeviceAuthFlowError.ErrInvalidAwsRegion:
-        return { success: false, code: AwsIamIdcDeviceAuthFlowError.ErrInvalidAwsRegion, error: e }
-      case AwsIamIdcDeviceAuthFlowError.ErrInvalidLabel:
-        return { success: false, code: AwsIamIdcDeviceAuthFlowError.ErrInvalidLabel, error: e }
-      case AwsIamIdcDeviceAuthFlowError.ErrTransientAwsClientError:
-        return { success: false, code: AwsIamIdcDeviceAuthFlowError.ErrTransientAwsClientError, error: e }
+      case AwsIdcDeviceAuthFlowError.ErrDeviceAuthFlowNotAuthorized:
+        return { success: false, code: AwsIdcDeviceAuthFlowError.ErrDeviceAuthFlowNotAuthorized, error: e }
+      case AwsIdcDeviceAuthFlowError.ErrDeviceAuthFlowTimedOut:
+        return { success: false, code: AwsIdcDeviceAuthFlowError.ErrDeviceAuthFlowTimedOut, error: e }
+      case AwsIdcDeviceAuthFlowError.ErrInvalidStartUrl:
+        return { success: false, code: AwsIdcDeviceAuthFlowError.ErrInvalidStartUrl, error: e }
+      case AwsIdcDeviceAuthFlowError.ErrInvalidAwsRegion:
+        return { success: false, code: AwsIdcDeviceAuthFlowError.ErrInvalidAwsRegion, error: e }
+      case AwsIdcDeviceAuthFlowError.ErrInvalidLabel:
+        return { success: false, code: AwsIdcDeviceAuthFlowError.ErrInvalidLabel, error: e }
+      case AwsIdcDeviceAuthFlowError.ErrTransientAwsClientError:
+        return { success: false, code: AwsIdcDeviceAuthFlowError.ErrTransientAwsClientError, error: e }
       default:
         throw e
     }

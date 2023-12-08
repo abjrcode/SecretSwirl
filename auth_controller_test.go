@@ -3,6 +3,7 @@ package main
 import (
 	"testing"
 
+	"github.com/abjrcode/swervo/internal/eventing"
 	"github.com/abjrcode/swervo/internal/migrations"
 	"github.com/abjrcode/swervo/internal/security/vault"
 	"github.com/abjrcode/swervo/internal/testhelpers"
@@ -15,7 +16,9 @@ func initAuthController(t *testing.T) (*AuthController, *testhelpers.MockClock) 
 
 	mockClock := testhelpers.NewMockClock()
 
-	vault := vault.NewVault(db, mockClock)
+	bus := eventing.NewEventbus(db, mockClock)
+
+	vault := vault.NewVault(db, bus, mockClock)
 
 	controller := NewAuthController(vault)
 

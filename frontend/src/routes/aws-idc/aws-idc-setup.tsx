@@ -1,10 +1,10 @@
 import { Form, useActionData, useNavigate } from "react-router-dom"
 import { useEffect } from "react"
 import { useWails } from "../../wails-provider/wails-context"
-import { AwsIamIdcSetupError, AwsIamIdcSetupResult } from "./aws-iam-idc-setup-data"
+import { AwsIdcSetupError, AwsIdcSetupResult } from "./aws-idc-setup-data"
 import { useToaster } from "../../toast-provider/toast-context"
 
-export function AwsIamIdcSetup() {
+export function AwsIdcSetup() {
   const wails = useWails()
   const toaster = useToaster()
   const navigate = useNavigate()
@@ -12,7 +12,7 @@ export function AwsIamIdcSetup() {
   const startUrl = "https://my-app.awsapps.com/start"
   const awsRegion = "eu-central-1"
 
-  const setupResult = useActionData() as AwsIamIdcSetupResult | undefined
+  const setupResult = useActionData() as AwsIdcSetupResult | undefined
 
   useEffect(() => {
     if (setupResult) {
@@ -32,21 +32,21 @@ export function AwsIamIdcSetup() {
         })
       } else {
         switch (setupResult.code) {
-          case AwsIamIdcSetupError.ErrInvalidStartUrl:
+          case AwsIdcSetupError.ErrInvalidStartUrl:
             toaster.showError("The Start URL is not valid")
             break
-          case AwsIamIdcSetupError.ErrInvalidAwsRegion:
+          case AwsIdcSetupError.ErrInvalidAwsRegion:
             toaster.showError("The AWS region is not valid")
             break
-          case AwsIamIdcSetupError.ErrInvalidLabel:
+          case AwsIdcSetupError.ErrInvalidLabel:
             toaster.showError(
               "The account label must be between 1 and 50 characters",
             )
             break
-          case AwsIamIdcSetupError.ErrInstanceAlreadyRegistered:
-            toaster.showWarning("AWS IAM Identity Center already exists")
+          case AwsIdcSetupError.ErrInstanceAlreadyRegistered:
+            toaster.showWarning("AWS Identity Center already exists")
             break
-          case AwsIamIdcSetupError.ErrTransientAwsClientError:
+          case AwsIdcSetupError.ErrTransientAwsClientError:
             toaster.showWarning(
               "There was an error, but it might work if you try again a bit later",
             )
@@ -61,7 +61,7 @@ export function AwsIamIdcSetup() {
       <Form
         method="post"
         className="flex flex-col gap-4 border-2 p-6">
-        <h1 className="text-primary text-4xl">AWS IAM Identity Center</h1>
+        <h1 className="text-primary text-4xl">AWS Identity Center</h1>
         <label className="label">
           <span className="label-text">Start URL</span>
         </label>
