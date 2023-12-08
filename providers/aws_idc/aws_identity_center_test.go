@@ -228,6 +228,8 @@ func TestNewAccount_FullSetup_Success(t *testing.T) {
 
 	mockTimeProvider.On("NowUnix").Return(1)
 
+	ch := controller.bus.Subscribe(AwsIdcEventSource)
+
 	instanceId, err := controller.FinalizeSetup(ctx, AwsIdc_FinalizeSetupCommandInput{
 		ClientId:   setupResult.ClientId,
 		StartUrl:   setupResult.StartUrl,
@@ -249,6 +251,15 @@ func TestNewAccount_FullSetup_Success(t *testing.T) {
 		ExpiresIn:       5,
 		VerificationUri: "https://test-verification-url",
 	})
+
+	event := <-ch
+
+	require.Equal(t, AwsIdcInstanceCreatedEvent{
+		InstanceId: instanceId,
+		StartUrl:   startUrl,
+		Region:     region,
+		Label:      label,
+	}, event.Data)
 }
 
 func TestNewAccountSetupErrorDoubleRegistration(t *testing.T) {
@@ -505,7 +516,7 @@ func TestListInstances(t *testing.T) {
 	mockAws.On("CreateToken").Once().Return(&mockTokenRes, nil)
 
 	tokenCreatedAt := 3
-	mockTimeProvider.On("NowUnix").Once().Return(tokenCreatedAt)
+	mockTimeProvider.On("NowUnix").Twice().Return(tokenCreatedAt)
 
 	instanceId2, err := controller.FinalizeSetup(ctx, AwsIdc_FinalizeSetupCommandInput{
 		ClientId:   setupResult.ClientId,

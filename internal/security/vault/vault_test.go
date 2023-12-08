@@ -63,15 +63,23 @@ func TestConfigureVault(t *testing.T) {
 	db, err := migrations.NewInMemoryMigratedDatabase(t, "TestConfigureVault")
 	require.NoError(t, err)
 	mockClock := testhelpers.NewMockClock()
-
+	bus := eventing.NewEventbus(db, mockClock)
 	mockClock.On("NowUnix").Return(1)
-	v := NewVault(db, eventing.NewEventbus(db, mockClock), mockClock)
 
-	t.Cleanup(v.Seal)
+	vault := NewVault(db, bus, mockClock)
+	t.Cleanup(vault.Seal)
 
-	err = v.Configure(testhelpers.NewMockAppContext(), "password")
+	ch := bus.Subscribe(VaultEventSource)
+	require.NoError(t, err)
 
+	err = vault.Configure(testhelpers.NewMockAppContext(), "password")
 	assert.NoError(t, err)
+
+	event := <-ch
+
+	assert.Equal(t, uint(1), event.EventVersion)
+	assert.IsType(t, VaultConfiguredEvent{}, event.Data)
+	assert.Equal(t, VaultEventSource, event.SourceType)
 }
 
 func TestConfigureVault_Twice(t *testing.T) {

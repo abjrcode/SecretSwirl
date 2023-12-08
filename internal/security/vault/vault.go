@@ -23,6 +23,10 @@ var (
 	ErrVaultNotConfiguredOrSealed = errors.New("vault is not configured or sealed")
 )
 
+var (
+	VaultEventSource = eventing.EventSource("Vault")
+)
+
 type VaultConfiguredEvent struct {
 	KeyId string
 }
@@ -115,7 +119,7 @@ func (v *vaultImpl) Configure(ctx app.Context, plainPassword string) error {
 	}
 	defer tx.Rollback()
 
-	version := 1
+	version := uint(1)
 
 	_, err = tx.ExecContext(ctx, `
 	INSERT INTO "argon_keys" (
@@ -158,9 +162,9 @@ func (v *vaultImpl) Configure(ctx app.Context, plainPassword string) error {
 	publish, err := v.bus.PublishTx(ctx, VaultConfiguredEvent{
 		KeyId: keyId,
 	}, eventing.EventMeta{
-		SourceType:   "Vault",
+		SourceType:   VaultEventSource,
 		SourceId:     keyId,
-		EventVersion: uint64(version),
+		EventVersion: version,
 	}, tx)
 	if err != nil {
 		return err

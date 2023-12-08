@@ -24,9 +24,9 @@ type EventSource string
 type EventEnvelope struct {
 	Id            uint64
 	EventType     string
-	EventVersion  uint64
+	EventVersion  uint
 	Data          interface{}
-	SourceType    string
+	SourceType    EventSource
 	SourceId      string
 	UserId        string
 	CreatedAt     uint64
@@ -58,21 +58,17 @@ func NewEventbus(db *sql.DB, clock utils.Clock) *Eventbus {
 
 // Subscribe subscribes to events from a given source. The returned channel
 // will receive all events published by the source.
-func (bus *Eventbus) Subscribe(source EventSource) (<-chan EventEnvelope, error) {
+func (bus *Eventbus) Subscribe(source EventSource) <-chan EventEnvelope {
 	bus.mu.Lock()
 	defer bus.mu.Unlock()
 
-	if bus.closed {
-		return nil, ErrBusClosed
-	}
-
 	ch := make(chan EventEnvelope, 1)
 	bus.subs[source] = append(bus.subs[source], ch)
-	return ch, nil
+	return ch
 }
 
 type EventMeta struct {
-	EventVersion uint64
+	EventVersion uint
 	SourceType   EventSource
 	SourceId     string
 }
@@ -92,7 +88,7 @@ func (bus *Eventbus) Publish(ctx app.Context, event interface{}, meta EventMeta)
 		EventType:     reflect.TypeOf(event).Name(),
 		EventVersion:  meta.EventVersion,
 		Data:          event,
-		SourceType:    string(meta.SourceType),
+		SourceType:    meta.SourceType,
 		SourceId:      meta.SourceId,
 		CreatedAt:     uint64(bus.clock.NowUnix()),
 		UserId:        ctx.UserId(),
@@ -147,7 +143,7 @@ func (bus *Eventbus) PublishTx(ctx app.Context, event interface{}, meta EventMet
 		EventType:     reflect.TypeOf(event).Name(),
 		EventVersion:  meta.EventVersion,
 		Data:          event,
-		SourceType:    string(meta.SourceType),
+		SourceType:    meta.SourceType,
 		SourceId:      meta.SourceId,
 		CreatedAt:     uint64(bus.clock.NowUnix()),
 		UserId:        ctx.UserId(),
