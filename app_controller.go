@@ -10,6 +10,7 @@ import (
 	"github.com/abjrcode/swervo/internal/app"
 	"github.com/abjrcode/swervo/internal/utils"
 	awsidc "github.com/abjrcode/swervo/providers/aws_idc"
+	awscredentialsfile "github.com/abjrcode/swervo/sinks/aws_credentials_file"
 	"github.com/rs/zerolog"
 	"github.com/wailsapp/wails/v2/pkg/menu"
 	"github.com/wailsapp/wails/v2/pkg/menu/keys"
@@ -28,7 +29,10 @@ type AppController struct {
 
 	authController      *AuthController
 	dashboardController *DashboardController
-	awsIdcController    *awsidc.AwsIdentityCenterController
+
+	awsIdcController *awsidc.AwsIdentityCenterController
+
+	awsCredentialsFileController *awscredentialsfile.AwsCredentialsFileController
 }
 
 func (c *AppController) Init(ctx context.Context, errorHandler app.ErrorHandler) {
@@ -132,6 +136,8 @@ func (c *AppController) RunAppCommand(command string, commandInput map[string]an
 		output = c.dashboardController.ListProviders()
 	case "Dashboard_ListFavorites":
 		output, err = c.dashboardController.ListFavorites(appContext)
+	case "Dashboard_ListSinks":
+		output = c.dashboardController.ListSinks()
 	case "AwsIdc_ListInstances":
 		output, err = c.awsIdcController.ListInstances(appContext)
 	case "AwsIdc_GetInstanceData":
@@ -176,6 +182,17 @@ func (c *AppController) RunAppCommand(command string, commandInput map[string]an
 				UserCode:   commandInput["userCode"].(string),
 				DeviceCode: commandInput["deviceCode"].(string),
 			})
+	case "AwsCredentialsFile_ListInstances":
+		output, err = c.awsCredentialsFileController.ListInstances(appContext)
+	case "AwsCredentialsFile_NewInstance":
+		output, err = c.awsCredentialsFileController.NewInstance(appContext,
+			awscredentialsfile.AwsCredentialsFile_NewInstanceCommandInput{
+				FilePath: commandInput["filePath"].(string),
+				Label:    commandInput["label"].(string),
+			})
+	case "AwsCredentialsFile_GetInstanceData":
+		output, err = c.awsCredentialsFileController.GetInstanceData(appContext,
+			commandInput["instanceId"].(string))
 	default:
 		output, err = nil, errors.Join(ErrInvalidAppCommand, app.ErrFatal)
 	}

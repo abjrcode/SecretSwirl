@@ -1,6 +1,6 @@
-import { awsidc } from '../../../wailsjs/go/models'
-import { ActionDataResult } from '../../utils/action-data-result'
-import { AwsIdc_GetInstanceData } from '../../utils/ipc-adapter'
+import { awsidc } from '../../../../wailsjs/go/models'
+import { ActionDataResult } from '../../../utils/action-data-result'
+import { AwsIdc_GetInstanceData } from '../../../utils/ipc-adapter'
 
 export enum AwsIdcCardDataError {
   ErrAccessTokenExpired = "ACCESS_TOKEN_EXPIRED",

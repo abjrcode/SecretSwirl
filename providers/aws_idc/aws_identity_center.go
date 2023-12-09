@@ -48,7 +48,7 @@ type AwsIdentityCenterController struct {
 	favoritesRepo     favorites.FavoritesRepo
 	encryptionService encryption.EncryptionService
 	awsSsoClient      awssso.AwsSsoOidcClient
-	timeHelper        utils.Clock
+	clock             utils.Clock
 	cache             *freecache.Cache
 }
 
@@ -62,7 +62,7 @@ func NewAwsIdentityCenterController(db *sql.DB, bus *eventing.Eventbus, favorite
 		favoritesRepo:     favoritesRepo,
 		encryptionService: encryptionService,
 		awsSsoClient:      awsSsoClient,
-		timeHelper:        datetime,
+		clock:             datetime,
 		cache:             cache,
 	}
 }
@@ -147,7 +147,7 @@ func (c *AwsIdentityCenterController) GetInstanceData(ctx app.Context, instanceI
 		return nil, errors.Join(err, app.ErrFatal)
 	}
 
-	now := c.timeHelper.NowUnix()
+	now := c.clock.NowUnix()
 	if now > accessTokenCreatedAt+accessTokenExpiresIn {
 		ctx.Logger().Info().Msgf("token for instance [%s] has expired", instanceId)
 
@@ -363,11 +363,6 @@ func (c *AwsIdentityCenterController) Setup(ctx app.Context, input AwsIdc_SetupC
 		return nil, ErrInstanceAlreadyRegistered
 	}
 
-	if len(label) < 1 || len(label) > 50 {
-		ctx.Logger().Debug().Msgf("invalid label [%s]", label)
-		return nil, ErrInvalidLabel
-	}
-
 	regRes, err := c.getOrRegisterClient(ctx, awsRegion)
 
 	if err != nil {
@@ -470,7 +465,7 @@ func (c *AwsIdentityCenterController) FinalizeSetup(ctx app.Context, input AwsId
 		return "", errors.Join(err, app.ErrFatal)
 	}
 
-	nowUnix := c.timeHelper.NowUnix()
+	nowUnix := c.clock.NowUnix()
 
 	uniqueId, err := ksuid.NewRandomWithTime(time.Unix(nowUnix, 0))
 	if err != nil {
@@ -670,7 +665,7 @@ func (c *AwsIdentityCenterController) FinalizeRefreshAccessToken(ctx app.Context
 		idTokenEnc,
 		accessTokenEnc,
 		tokenRes.TokenType,
-		c.timeHelper.NowUnix(),
+		c.clock.NowUnix(),
 		tokenRes.ExpiresIn,
 		refreshTokenEnc,
 		keyId, input.InstanceId)
@@ -738,7 +733,7 @@ func (c *AwsIdentityCenterController) getOrRegisterClient(ctx app.Context, awsRe
 		return output, nil
 	}
 
-	if c.timeHelper.NowUnix() > result.ExpiresAt {
+	if c.clock.NowUnix() > result.ExpiresAt {
 		ctx.Logger().Info().Msg("client expired. registering new client")
 
 		friendlyClientName := fmt.Sprintf("swervo_%s", utils.RandomString(6))

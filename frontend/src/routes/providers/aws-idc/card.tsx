@@ -1,15 +1,15 @@
 import React from "react"
 import { useFetcher, useNavigate, useRevalidator } from "react-router-dom"
 
-import { AwsIdcCardDataError, AwsIdcCardDataResult } from "./aws-idc-card-data"
-import { useWails } from "../../wails-provider/wails-context"
-import { useToaster } from "../../toast-provider/toast-context"
+import { AwsIdcCardDataError, AwsIdcCardDataResult } from "./card-data"
+import { useWails } from "../../../wails-provider/wails-context"
+import { useToaster } from "../../../toast-provider/toast-context"
 import {
   AwsIdc_GetRoleCredentials,
   AwsIdc_MarkAsFavorite,
   AwsIdc_RefreshAccessToken,
   AwsIdc_UnmarkAsFavorite,
-} from "../../utils/ipc-adapter"
+} from "../../../utils/ipc-adapter"
 
 export function AwsIdcCard({ instanceId }: { instanceId: string }) {
   const wails = useWails()

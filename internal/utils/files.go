@@ -3,6 +3,7 @@ package utils
 import (
 	"io"
 	"os"
+	"path/filepath"
 )
 
 func CopyFile(source, destination string) error {
@@ -19,6 +20,31 @@ func CopyFile(source, destination string) error {
 	defer destinationFile.Close()
 
 	_, err = io.Copy(destinationFile, sourceFile)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func SafelyOverwriteFile(filePath string, content string) error {
+	tempFile, err := os.CreateTemp(filepath.Dir(filePath), "swervo_temp")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tempFile.Name())
+
+	_, err = tempFile.WriteString(content)
+	if err != nil {
+		return err
+	}
+
+	err = tempFile.Sync()
+	if err != nil {
+		return err
+	}
+
+	err = os.Rename(tempFile.Name(), filePath)
 	if err != nil {
 		return err
 	}
