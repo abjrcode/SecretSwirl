@@ -1,8 +1,8 @@
 import { Form, useActionData, useNavigate } from "react-router-dom"
 import { useEffect } from "react"
-import { useWails } from "../../wails-provider/wails-context"
-import { AwsIdcSetupError, AwsIdcSetupResult } from "./aws-idc-setup-data"
-import { useToaster } from "../../toast-provider/toast-context"
+import { useWails } from "../../../wails-provider/wails-context"
+import { AwsIdcSetupError, AwsIdcSetupResult } from "./setup-data"
+import { useToaster } from "../../../toast-provider/toast-context"
 
 export function AwsIdcSetup() {
   const wails = useWails()

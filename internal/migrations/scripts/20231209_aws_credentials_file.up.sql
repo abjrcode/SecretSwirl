@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS "aws_credentials_file" (
+	"instance_id"	TEXT NOT NULL UNIQUE COLLATE NOCASE,
+	"version" INTEGER NOT NULL,
+	"file_path"	TEXT NOT NULL UNIQUE COLLATE NOCASE,
+	"label"	TEXT NOT NULL,
+	PRIMARY KEY("instance_id")
+) WITHOUT ROWID;

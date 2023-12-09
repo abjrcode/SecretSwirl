@@ -9,3 +9,7 @@ export function ListFavorites(arg1) {
 export function ListProviders() {
   return window['go']['main']['DashboardController']['ListProviders']();
 }
+
+export function ListSinks() {
+  return window['go']['main']['DashboardController']['ListSinks']();
+}

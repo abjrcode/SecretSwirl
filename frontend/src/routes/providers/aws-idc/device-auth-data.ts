@@ -1,6 +1,6 @@
 import { ActionFunctionArgs } from "react-router-dom"
-import { AwsIdc_FinalizeRefreshAccessToken, AwsIdc_FinalizeSetup } from "../../utils/ipc-adapter"
-import { ActionDataResult } from "../../utils/action-data-result"
+import { AwsIdc_FinalizeRefreshAccessToken, AwsIdc_FinalizeSetup } from "../../../utils/ipc-adapter"
+import { ActionDataResult } from "../../../utils/action-data-result"
 
 export enum AwsIdcDeviceAuthFlowError {
   ErrDeviceAuthFlowNotAuthorized = "DEVICE_AUTH_FLOW_NOT_AUTHORIZED",

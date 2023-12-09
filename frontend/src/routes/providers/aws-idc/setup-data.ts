@@ -1,7 +1,7 @@
 import { ActionFunctionArgs } from "react-router-dom"
-import { awsidc } from "../../../wailsjs/go/models"
-import { ActionDataResult } from "../../utils/action-data-result"
-import { AwsIdc_Setup } from "../../utils/ipc-adapter"
+import { awsidc } from "../../../../wailsjs/go/models"
+import { ActionDataResult } from "../../../utils/action-data-result"
+import { AwsIdc_Setup } from "../../../utils/ipc-adapter"
 
 export enum AwsIdcSetupError {
   ErrInstanceAlreadyRegistered = "INSTANCE_ALREADY_REGISTERED",

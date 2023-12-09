@@ -1,5 +1,5 @@
-import { ListProviders } from "../../../wailsjs/go/main/DashboardController"
+import { Dashboard_ListProviders } from "../../utils/ipc-adapter";
 
 export async function providersLoader() {
-  return ListProviders()
+  return Dashboard_ListProviders()
 }

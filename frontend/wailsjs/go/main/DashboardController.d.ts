@@ -6,3 +6,5 @@ import {main} from '../models';
 export function ListFavorites(arg1:app.Context):Promise<Array<main.FavoriteInstance>>;
 
 export function ListProviders():Promise<Array<main.Provider>>;
+
+export function ListSinks():Promise<Array<main.Sink>>;
