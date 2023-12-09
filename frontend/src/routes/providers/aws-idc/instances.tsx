@@ -1,5 +1,5 @@
 import { Link, useLoaderData } from "react-router-dom"
-import { AwsIdcCard } from "./aws-idc-card"
+import { AwsIdcCard } from "./card"
 
 export function AwsIdcInstances() {
   const loader = useLoaderData() as string[] | undefined

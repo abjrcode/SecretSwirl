@@ -57,6 +57,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 className="btn btn-primary btn-outline capitalize">
                 providers
               </Link>
+              <Link
+                to="/sinks"
+                className="btn btn-primary btn-outline capitalize">
+                sinks
+              </Link>
             </nav>
 
             <button

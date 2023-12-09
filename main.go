@@ -18,6 +18,7 @@ import (
 	"github.com/abjrcode/swervo/internal/security/vault"
 	"github.com/abjrcode/swervo/internal/utils"
 	awsidc "github.com/abjrcode/swervo/providers/aws_idc"
+	awscredentialsfile "github.com/abjrcode/swervo/sinks/aws_credentials_file"
 
 	_ "github.com/golang-migrate/migrate/v4/database/sqlite3"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -105,10 +106,13 @@ func main() {
 
 	awsIdcController := awsidc.NewAwsIdentityCenterController(db, eventBus, favoritesRepo, vault, awssso.NewAwsSsoOidcClient(), clock)
 
+	awsCredentialsFileController := awscredentialsfile.NewAwsCredentialsFileController(db, eventBus, vault, clock)
+
 	appController := &AppController{
-		authController:      authController,
-		dashboardController: dashboardController,
-		awsIdcController:    awsIdcController,
+		authController:               authController,
+		dashboardController:          dashboardController,
+		awsIdcController:             awsIdcController,
+		awsCredentialsFileController: awsCredentialsFileController,
 	}
 
 	logger.Info().Msgf("PID [%d] - launching Swervo", os.Getpid())
@@ -129,6 +133,7 @@ func main() {
 			authController,
 			dashboardController,
 			awsIdcController,
+			awsCredentialsFileController,
 		},
 	}); err != nil {
 		errorHandler.Catch(nil, logger, errors.New("failed to launch Swervo"))

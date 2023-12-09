@@ -1,3 +1,38 @@
+export namespace awscredentialsfile {
+	
+	export class AwsCredentialsFileInstance {
+	    instanceId: string;
+	    filePath: string;
+	    label: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AwsCredentialsFileInstance(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.instanceId = source["instanceId"];
+	        this.filePath = source["filePath"];
+	        this.label = source["label"];
+	    }
+	}
+	export class AwsCredentialsFile_NewInstanceCommandInput {
+	    filePath: string;
+	    label: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AwsCredentialsFile_NewInstanceCommandInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.filePath = source["filePath"];
+	        this.label = source["label"];
+	    }
+	}
+
+}
+
 export namespace awsidc {
 	
 	export class AuthorizeDeviceFlowResult {
@@ -257,6 +292,22 @@ export namespace main {
 	
 	    static createFrom(source: any = {}) {
 	        return new Provider(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.code = source["code"];
+	        this.name = source["name"];
+	        this.iconSvgBase64 = source["iconSvgBase64"];
+	    }
+	}
+	export class Sink {
+	    code: string;
+	    name: string;
+	    iconSvgBase64: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Sink(source);
 	    }
 	
 	    constructor(source: any = {}) {
