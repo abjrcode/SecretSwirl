@@ -6,11 +6,8 @@ import (
 	"github.com/abjrcode/swervo/favorites"
 	"github.com/abjrcode/swervo/internal/app"
 	"github.com/abjrcode/swervo/providers"
+	"github.com/abjrcode/swervo/sinks"
 )
-
-type DashboardController struct {
-	favoritesRepo favorites.FavoritesRepo
-}
 
 type Provider struct {
 	Code          string `json:"code"`
@@ -21,6 +18,16 @@ type Provider struct {
 type FavoriteInstance struct {
 	ProviderCode string `json:"providerCode"`
 	InstanceId   string `json:"instanceId"`
+}
+
+type Sink struct {
+	Code          string `json:"code"`
+	Name          string `json:"name"`
+	IconSvgBase64 string `json:"iconSvgBase64"`
+}
+
+type DashboardController struct {
+	favoritesRepo favorites.FavoritesRepo
 }
 
 var supportedProviders []Provider
@@ -60,4 +67,16 @@ func (c *DashboardController) ListFavorites(ctx app.Context) ([]FavoriteInstance
 
 func (c *DashboardController) ListProviders() []Provider {
 	return supportedProviders
+}
+
+func (c *DashboardController) ListSinks() []Sink {
+	supportedSinks := make([]Sink, 0, len(sinks.SupportedSinks))
+	for _, sink := range sinks.SupportedSinks {
+		supportedSinks = append(supportedSinks, Sink{
+			Code: sink.Code,
+			Name: sink.Name,
+		})
+	}
+
+	return supportedSinks
 }

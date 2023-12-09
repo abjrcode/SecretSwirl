@@ -1,5 +1,5 @@
 import { useLoaderData } from "react-router-dom"
-import { AwsIdcCard } from "../aws-idc/aws-idc-card"
+import { AwsIdcCard } from "../providers/aws-idc/card"
 import { main } from "../../../wailsjs/go/models"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

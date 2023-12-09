@@ -1,11 +1,11 @@
 import { Form, useActionData, useLocation, useNavigate } from "react-router-dom"
-import { ExternalLink } from "../../components/external-link"
+import { ExternalLink } from "../../../components/external-link"
 import {
   AwsIdcDeviceAuthFlowError,
   AwsIdcDeviceAuthFlowResult,
-} from "./aws-idc-device-auth-data"
+} from "./device-auth-data"
 import { useEffect, useRef } from "react"
-import { useToaster } from "../../toast-provider/toast-context"
+import { useToaster } from "../../../toast-provider/toast-context"
 
 export function AwsIdcDeviceAuth() {
   const toaster = useToaster()

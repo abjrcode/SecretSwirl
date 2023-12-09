@@ -7,20 +7,27 @@ import { createHashRouter, RouterProvider } from "react-router-dom"
 import { Dashboard } from "./routes/dashboard/dashboard"
 import { dashboardLoader } from "./routes/dashboard/dashboard-data"
 import { providersLoader } from "./routes/providers/providers-data"
-import { awsIdcCardLoader } from "./routes/aws-idc/aws-idc-card-data"
+import { awsIdcCardLoader } from "./routes/providers/aws-idc/card-data"
 import { Providers } from "./routes/providers/providers"
-import { AwsIdcSetup } from "./routes/aws-idc/aws-idc-setup"
-import { awsIdcSetupAction } from "./routes/aws-idc/aws-idc-setup-data"
+import { AwsIdcSetup } from "./routes/providers/aws-idc/setup"
+import { awsIdcSetupAction } from "./routes/providers/aws-idc/setup-data"
 import { Vault } from "./routes/vault/vault"
 import { AuthProvider } from "./auth-provider/auth-provider"
 import { ErrorPage } from "./error-page"
 import { WailsProvider } from "./wails-provider/wails-provider"
-import { AwsIdcDeviceAuth } from "./routes/aws-idc/aws-idc-device-auth"
-import { awsIdcDeviceAuthAction } from "./routes/aws-idc/aws-idc-device-auth-data"
+import { AwsIdcDeviceAuth } from "./routes/providers/aws-idc/device-auth"
+import { awsIdcDeviceAuthAction } from "./routes/providers/aws-idc/device-auth-data"
 import { ToastProvider } from "./toast-provider/toast-provider"
-import { AwsIdcInstances } from "./routes/aws-idc/aws-idc-instances"
-import { awsIdcInstancesData } from "./routes/aws-idc/aws-idc-instances-data"
+import { AwsIdcInstances } from "./routes/providers/aws-idc/instances"
+import { awsIdcInstancesData } from "./routes/providers/aws-idc/instances-data"
 import { Auth_IsVaultConfigured } from "./utils/ipc-adapter"
+import { Sinks } from "./routes/sinks/sinks"
+import { sinksLoader } from "./routes/sinks/sinks-data"
+import { AwsCredentialsFileInstances } from "./routes/sinks/aws-credentials-file/instances"
+import { awsCredentialsFileInstancesData } from "./routes/sinks/aws-credentials-file/instances-data"
+import { AwsCredentialsFileNew } from "./routes/sinks/aws-credentials-file/new"
+import { awsCredentialsFileSetupAction } from "./routes/sinks/aws-credentials-file/new-data"
+import { awsCredentialsFileCardLoader } from "./routes/sinks/aws-credentials-file/card-data"
 
 const devMode = import.meta.env.DEV
 
@@ -68,11 +75,47 @@ void (async function main() {
             },
           ],
         },
+        {
+          path: "/sinks",
+          element: <Sinks />,
+          loader: sinksLoader,
+          children: [
+            {
+              path: "aws-credentials-file",
+              children: [
+                {
+                  index: true,
+                  element: <AwsCredentialsFileInstances />,
+                  loader: awsCredentialsFileInstancesData,
+                },
+                {
+                  path: "setup",
+                  element: <AwsCredentialsFileNew />,
+                  action: awsCredentialsFileSetupAction,
+                },
+              ],
+            },
+          ],
+        },
       ],
     },
     {
-      path: "/internal/api/aws-idc-card",
-      loader: awsIdcCardLoader,
+      path: "/internal",
+      children: [
+        {
+          path: "api",
+          children: [
+            {
+              path: "aws-idc-card",
+              loader: awsIdcCardLoader,
+            },
+            {
+              path: "aws-credentials-file-card",
+              loader: awsCredentialsFileCardLoader,
+            },
+          ],
+        },
+      ],
     },
   ])
 
