@@ -78,7 +78,7 @@ func TestAuthController_UnlockVault_WithWrongPassword(t *testing.T) {
 	err := controller.ConfigureVault(ctx, Auth_ConfigureVaultCommandInput{Password: "password"})
 	require.NoError(t, err)
 
-	controller.LockVault()
+	controller.LockVault(ctx)
 
 	mockTimeProvider.On("NowUnix").Return(2)
 	unlocked, err := controller.UnlockVault(ctx, Auth_UnlockCommandInput{Password: "wrong-password"})
@@ -99,8 +99,9 @@ func TestAuthController_UnlockVault_WithoutConfiguringFirst(t *testing.T) {
 
 func TestAuthController_LockVault_WithoutConfiguringFirst(t *testing.T) {
 	controller, _ := initAuthController(t)
+	mockContext := testhelpers.NewMockAppContext()
 
-	controller.LockVault()
+	controller.LockVault(mockContext)
 }
 
 func TestAuthController_LockVault_WithoutUnlockingFirst(t *testing.T) {
@@ -111,7 +112,7 @@ func TestAuthController_LockVault_WithoutUnlockingFirst(t *testing.T) {
 	err := controller.ConfigureVault(ctx, Auth_ConfigureVaultCommandInput{Password: "password"})
 	require.NoError(t, err)
 
-	controller.LockVault()
+	controller.LockVault(ctx)
 }
 
 func TestAuthController_UnlockVault_WithoutLockingFirst(t *testing.T) {

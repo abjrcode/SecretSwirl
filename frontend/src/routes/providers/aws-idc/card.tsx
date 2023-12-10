@@ -9,7 +9,10 @@ import {
   AwsIdc_MarkAsFavorite,
   AwsIdc_RefreshAccessToken,
   AwsIdc_UnmarkAsFavorite,
+  Plumbing_DisconnectSink,
 } from "../../../utils/ipc-adapter"
+import { createSinkCard } from "../../../components/sink-component-map"
+import { ProviderCodes } from "../../../utils/provider-sink-codes"
 
 export function AwsIdcCard({ instanceId }: { instanceId: string }) {
   const wails = useWails()
@@ -21,7 +24,7 @@ export function AwsIdcCard({ instanceId }: { instanceId: string }) {
   async function authorizeDevice(instanceId: string) {
     const deviceAuthFlowResult = await AwsIdc_RefreshAccessToken(instanceId)
 
-    navigate("/providers/aws-idc/device-auth", {
+    navigate(`/providers/${ProviderCodes.AwsIdc}/device-auth`, {
       state: {
         action: "refresh",
         instanceId: deviceAuthFlowResult.instanceId,
@@ -41,7 +44,9 @@ export function AwsIdcCard({ instanceId }: { instanceId: string }) {
       const urlSearchParams = new URLSearchParams()
       urlSearchParams.append("instanceId", instanceId)
       urlSearchParams.append("refresh", "false")
-      fetcher.load(`/internal/api/aws-idc-card?${urlSearchParams.toString()}`)
+      fetcher.load(
+        `/internal/api/${ProviderCodes.AwsIdc}-card?${urlSearchParams.toString()}`,
+      )
     }
   }, [instanceId, fetcher])
 
@@ -50,7 +55,9 @@ export function AwsIdcCard({ instanceId }: { instanceId: string }) {
     urlSearchParams.append("instanceId", instanceId)
     urlSearchParams.append("refresh", "true")
 
-    fetcher.load(`/internal/api/aws-idc-card?${urlSearchParams.toString()}`)
+    fetcher.load(
+      `/internal/api/${ProviderCodes.AwsIdc}-card?${urlSearchParams.toString()}`,
+    )
   }
 
   async function markAsFavorite() {
@@ -81,6 +88,12 @@ export function AwsIdcCard({ instanceId }: { instanceId: string }) {
     `
     await wails.runtime.ClipboardSetText(credentialsProfile)
     toaster.showSuccess("Copied credentials to clipboard!")
+  }
+
+  async function disconnectPipe(sinkCode: string, sinkId: string) {
+    await Plumbing_DisconnectSink({ sinkCode, sinkId })
+    fetcher.data = undefined
+    validator.revalidate()
   }
 
   const cardDataResult = fetcher.data as AwsIdcCardDataResult | undefined
@@ -143,7 +156,7 @@ export function AwsIdcCard({ instanceId }: { instanceId: string }) {
         <div className="card-body">
           {!cardData.isAccessTokenExpired && (
             <>
-              <h2 className="text-xl">Accounts</h2>
+              <h2 className="text-xl font-semibold">Accounts</h2>
               <ul className="list-disc pl-4 space-y-4">
                 {cardData.accounts.map((account) => (
                   <li key={account.accountId}>
@@ -184,7 +197,31 @@ export function AwsIdcCard({ instanceId }: { instanceId: string }) {
               <p>Please renew it by authorizing the device again.</p>
             </>
           )}
+
+          {cardData.sinks.length > 0 && (
+            <>
+              <div className="divider"></div>
+              <h2 className="text-xl font-semibold">Connections</h2>
+              <ul className="list-none pl-4 space-y-4">
+                {cardData.sinks.map((sink) => (
+                  <li key={sink.sinkId}>
+                    <div className="flex gap-4">
+                      <div className="flex-1">
+                        {createSinkCard(sink.sinkCode, sink.sinkId)}
+                      </div>
+                      <button
+                        className="font-bold"
+                        onClick={() => disconnectPipe(sink.sinkCode, sink.sinkId)}>
+                        X
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </div>
+
         <div className="card-actions items-center justify-between">
           {cardData.isAccessTokenExpired && (
             <div className="flex flex-col gap-2">

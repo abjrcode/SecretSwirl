@@ -2,8 +2,9 @@ import React from "react"
 import { useFetcher } from "react-router-dom"
 
 import { AwsCredentialsFileCardDataResult } from "./card-data"
+import { SinkCodes } from "../../../utils/provider-sink-codes"
 
-export function AwsCredentialsFileCard({ instanceId }: { instanceId: string }) {
+export function AwsCredentialsFile({ instanceId }: { instanceId: string }) {
   const fetcher = useFetcher()
 
   React.useEffect(() => {
@@ -11,7 +12,9 @@ export function AwsCredentialsFileCard({ instanceId }: { instanceId: string }) {
       const urlSearchParams = new URLSearchParams()
       urlSearchParams.append("instanceId", instanceId)
       fetcher.load(
-        `/internal/api/aws-credentials-file-card?${urlSearchParams.toString()}`,
+        `/internal/api/${
+          SinkCodes.AwsCredentialsFile
+        }-card?${urlSearchParams.toString()}`,
       )
     }
   }, [instanceId, fetcher])
@@ -26,16 +29,9 @@ export function AwsCredentialsFileCard({ instanceId }: { instanceId: string }) {
     const cardData = cardDataResult.result
 
     return (
-      <div className="card gap-6 px-6 py-4 max-w-lg card-bordered border-secondary bg-base-200 drop-shadow-lg">
-        <div
-          role="heading"
-          className="card-title justify-between">
-          <div className="inline-flex items-center justify-center gap-2">
-            <h1 className="text-2xl font-semibold">{cardData.label}</h1>
-          </div>
-        </div>
-        <div className="card-body">{cardData.filePath}</div>
-        <div className="card-actions items-center justify-between"></div>
+      <div className="border-black border-[1px] rounded p-1 bg-secondary-content shadow-md">
+        <h1 className="font-medium">{cardData.label}</h1>
+        <div className="text-sm pl-4">{cardData.filePath}</div>
       </div>
     )
   }

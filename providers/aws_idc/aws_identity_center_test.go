@@ -259,7 +259,7 @@ func TestNewAccount_FullSetup_Success(t *testing.T) {
 		StartUrl:   startUrl,
 		Region:     region,
 		Label:      label,
-	}, event.Data)
+	}, event.Event)
 }
 
 func TestNewAccountSetupErrorDoubleRegistration(t *testing.T) {

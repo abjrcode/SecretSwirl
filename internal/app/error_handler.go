@@ -8,7 +8,31 @@ import (
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-var ErrFatal = errors.New("FATAL_ERROR")
+type ValidationError struct {
+	ActualError error
+}
+
+func (e *ValidationError) Error() string {
+	return e.ActualError.Error()
+}
+
+func (e *ValidationError) Is(target error) bool {
+	_, ok := target.(*ValidationError)
+	return ok
+}
+
+func (e *ValidationError) Unwrap() error {
+	return e.ActualError
+}
+
+var (
+	ErrValidation = &ValidationError{ActualError: errors.New("VALIDATION_ERROR")}
+	ErrFatal      = errors.New("FATAL_ERROR")
+)
+
+func NewValidationError(msg string) error {
+	return &ValidationError{ActualError: errors.New(msg)}
+}
 
 type ErrorHandler interface {
 	Catch(ctx Context, logger zerolog.Logger, err error)
