@@ -78,7 +78,7 @@ func TestConfigureVault(t *testing.T) {
 	event := <-ch
 
 	assert.Equal(t, uint(1), event.EventVersion)
-	assert.IsType(t, VaultConfiguredEvent{}, event.Data)
+	assert.IsType(t, VaultConfiguredEvent{}, event.Event)
 	assert.Equal(t, VaultEventSource, event.SourceType)
 }
 

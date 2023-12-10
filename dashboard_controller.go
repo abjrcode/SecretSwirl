@@ -6,7 +6,7 @@ import (
 	"github.com/abjrcode/swervo/favorites"
 	"github.com/abjrcode/swervo/internal/app"
 	"github.com/abjrcode/swervo/providers"
-	"github.com/abjrcode/swervo/sinks"
+	awsidc "github.com/abjrcode/swervo/providers/aws_idc"
 )
 
 type Provider struct {
@@ -20,10 +20,13 @@ type FavoriteInstance struct {
 	InstanceId   string `json:"instanceId"`
 }
 
-type Sink struct {
-	Code          string `json:"code"`
-	Name          string `json:"name"`
-	IconSvgBase64 string `json:"iconSvgBase64"`
+type CompatibleSink struct {
+	Code string `json:"code"`
+	Name string `json:"name"`
+}
+
+var ProviderCompatibleSinksMap = map[string][]CompatibleSink{
+	awsidc.ProviderCode: {},
 }
 
 type DashboardController struct {
@@ -69,14 +72,12 @@ func (c *DashboardController) ListProviders() []Provider {
 	return supportedProviders
 }
 
-func (c *DashboardController) ListSinks() []Sink {
-	supportedSinks := make([]Sink, 0, len(sinks.SupportedSinks))
-	for _, sink := range sinks.SupportedSinks {
-		supportedSinks = append(supportedSinks, Sink{
-			Code: sink.Code,
-			Name: sink.Name,
-		})
+func (c *DashboardController) ListCompatibleSinks(ctx app.Context, providerCode string) []CompatibleSink {
+	sinkCodes, ok := ProviderCompatibleSinksMap[providerCode]
+
+	if !ok {
+		return []CompatibleSink{}
 	}
 
-	return supportedSinks
+	return sinkCodes
 }

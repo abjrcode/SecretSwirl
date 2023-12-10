@@ -13,23 +13,25 @@ import (
 	"github.com/abjrcode/swervo/favorites"
 	"github.com/abjrcode/swervo/internal/app"
 	"github.com/abjrcode/swervo/internal/eventing"
+	"github.com/abjrcode/swervo/internal/plumbing"
 	"github.com/abjrcode/swervo/internal/security/encryption"
 	"github.com/abjrcode/swervo/internal/utils"
-	"github.com/abjrcode/swervo/providers"
 	"github.com/coocood/freecache"
 	"github.com/dustin/go-humanize"
 	"github.com/segmentio/ksuid"
 )
 
+var ProviderCode = "aws-idc"
+
 var (
-	ErrInvalidStartUrl             = errors.New("INVALID_START_URL")
-	ErrInvalidAwsRegion            = errors.New("INVALID_AWS_REGION")
-	ErrInvalidLabel                = errors.New("INVALID_LABEL")
-	ErrDeviceAuthFlowNotAuthorized = errors.New("DEVICE_AUTH_FLOW_NOT_AUTHORIZED")
-	ErrDeviceAuthFlowTimedOut      = errors.New("DEVICE_AUTH_FLOW_TIMED_OUT")
-	ErrInstanceWasNotFound         = errors.New("INSTANCE_WAS_NOT_FOUND")
-	ErrInstanceAlreadyRegistered   = errors.New("INSTANCE_ALREADY_REGISTERED")
-	ErrTransientAwsClientError     = errors.New("TRANSIENT_AWS_CLIENT_ERROR")
+	ErrInvalidStartUrl             = app.NewValidationError("INVALID_START_URL")
+	ErrInvalidAwsRegion            = app.NewValidationError("INVALID_AWS_REGION")
+	ErrInvalidLabel                = app.NewValidationError("INVALID_LABEL")
+	ErrDeviceAuthFlowNotAuthorized = app.NewValidationError("DEVICE_AUTH_FLOW_NOT_AUTHORIZED")
+	ErrDeviceAuthFlowTimedOut      = app.NewValidationError("DEVICE_AUTH_FLOW_TIMED_OUT")
+	ErrInstanceWasNotFound         = app.NewValidationError("INSTANCE_WAS_NOT_FOUND")
+	ErrInstanceAlreadyRegistered   = app.NewValidationError("INSTANCE_ALREADY_REGISTERED")
+	ErrTransientAwsClientError     = app.NewValidationError("TRANSIENT_AWS_CLIENT_ERROR")
 )
 
 var AwsIdcEventSource = eventing.EventSource("AwsIdc")
@@ -42,6 +44,12 @@ type AwsIdcInstanceCreatedEvent struct {
 	Label    string
 }
 
+type AwsCredentials struct {
+	AccessKeyID     string
+	SecretAccessKey string
+	SessionToken    string
+}
+
 type AwsIdentityCenterController struct {
 	db                *sql.DB
 	bus               *eventing.Eventbus
@@ -50,6 +58,8 @@ type AwsIdentityCenterController struct {
 	awsSsoClient      awssso.AwsSsoOidcClient
 	clock             utils.Clock
 	cache             *freecache.Cache
+
+	plumbers []plumbing.Plumber[AwsCredentials]
 }
 
 func NewAwsIdentityCenterController(db *sql.DB, bus *eventing.Eventbus, favoritesRepo favorites.FavoritesRepo, encryptionService encryption.EncryptionService, awsSsoClient awssso.AwsSsoOidcClient, datetime utils.Clock) *AwsIdentityCenterController {
@@ -64,7 +74,12 @@ func NewAwsIdentityCenterController(db *sql.DB, bus *eventing.Eventbus, favorite
 		awsSsoClient:      awsSsoClient,
 		clock:             datetime,
 		cache:             cache,
+		plumbers:          make([]plumbing.Plumber[AwsCredentials], 0),
 	}
+}
+
+func (c *AwsIdentityCenterController) AddPlumbers(plumbers ...plumbing.Plumber[AwsCredentials]) {
+	c.plumbers = append(c.plumbers, plumbers...)
 }
 
 type AwsIdentityCenterAccountRole struct {
@@ -92,6 +107,8 @@ type AwsIdentityCenterCardData struct {
 	IsAccessTokenExpired bool                       `json:"isAccessTokenExpired"`
 	AccessTokenExpiresIn string                     `json:"accessTokenExpiresIn"`
 	Accounts             []AwsIdentityCenterAccount `json:"accounts"`
+
+	Sinks []plumbing.SinkInstance `json:"sinks"`
 }
 
 func (c *AwsIdentityCenterController) ListInstances(ctx app.Context) ([]string, error) {
@@ -139,13 +156,15 @@ func (c *AwsIdentityCenterController) GetInstanceData(ctx app.Context, instanceI
 	}
 
 	isFavorite, err := c.favoritesRepo.IsFavorite(ctx, &favorites.Favorite{
-		ProviderCode: providers.AwsIdc,
+		ProviderCode: ProviderCode,
 		InstanceId:   instanceId,
 	})
 
 	if err != nil {
 		return nil, errors.Join(err, app.ErrFatal)
 	}
+
+	sinks := make([]plumbing.SinkInstance, 0)
 
 	now := c.clock.NowUnix()
 	if now > accessTokenCreatedAt+accessTokenExpiresIn {
@@ -159,7 +178,25 @@ func (c *AwsIdentityCenterController) GetInstanceData(ctx app.Context, instanceI
 			IsAccessTokenExpired: true,
 			AccessTokenExpiresIn: humanize.Time(time.Unix(accessTokenCreatedAt+accessTokenExpiresIn, 0)),
 			Accounts:             make([]AwsIdentityCenterAccount, 0),
+
+			Sinks: sinks,
 		}, nil
+	}
+
+	for _, plumber := range c.plumbers {
+		connectedSinks, err := plumber.ListConnectedSinks(ctx, ProviderCode, instanceId)
+
+		if err != nil {
+			ctx.Logger().Error().Err(err).Msg("failed to list pipes")
+			return nil, errors.Join(err, app.ErrFatal)
+		}
+
+		for _, pipe := range connectedSinks {
+			sinks = append(sinks, plumbing.SinkInstance{
+				SinkCode: pipe.SinkCode,
+				SinkId:   pipe.SinkId,
+			})
+		}
 	}
 
 	if !forceRefresh {
@@ -186,6 +223,8 @@ func (c *AwsIdentityCenterController) GetInstanceData(ctx app.Context, instanceI
 				IsAccessTokenExpired: false,
 				AccessTokenExpiresIn: humanize.Time(time.Unix(accessTokenCreatedAt+accessTokenExpiresIn, 0)),
 				Accounts:             accounts,
+
+				Sinks: sinks,
 			}, nil
 		}
 	}
@@ -243,6 +282,8 @@ func (c *AwsIdentityCenterController) GetInstanceData(ctx app.Context, instanceI
 		IsAccessTokenExpired: false,
 		AccessTokenExpiresIn: humanize.Time(time.Unix(accessTokenCreatedAt+accessTokenExpiresIn, 0)),
 		Accounts:             accounts,
+
+		Sinks: sinks,
 	}, nil
 }
 
@@ -530,14 +571,14 @@ func (c *AwsIdentityCenterController) FinalizeSetup(ctx app.Context, input AwsId
 
 func (c *AwsIdentityCenterController) MarkAsFavorite(ctx app.Context, instanceId string) error {
 	return c.favoritesRepo.Add(ctx, &favorites.Favorite{
-		ProviderCode: providers.AwsIdc,
+		ProviderCode: ProviderCode,
 		InstanceId:   instanceId,
 	})
 }
 
 func (c *AwsIdentityCenterController) UnmarkAsFavorite(ctx app.Context, instanceId string) error {
 	return c.favoritesRepo.Remove(ctx, &favorites.Favorite{
-		ProviderCode: providers.AwsIdc,
+		ProviderCode: ProviderCode,
 		InstanceId:   instanceId,
 	})
 }

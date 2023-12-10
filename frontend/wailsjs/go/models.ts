@@ -2,8 +2,14 @@ export namespace awscredentialsfile {
 	
 	export class AwsCredentialsFileInstance {
 	    instanceId: string;
+	    version: number;
 	    filePath: string;
+	    awsProfileName: string;
 	    label: string;
+	    providerCode: string;
+	    providerId: string;
+	    createdAt: number;
+	    lastDrainedAt?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new AwsCredentialsFileInstance(source);
@@ -12,13 +18,22 @@ export namespace awscredentialsfile {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.instanceId = source["instanceId"];
+	        this.version = source["version"];
 	        this.filePath = source["filePath"];
+	        this.awsProfileName = source["awsProfileName"];
 	        this.label = source["label"];
+	        this.providerCode = source["providerCode"];
+	        this.providerId = source["providerId"];
+	        this.createdAt = source["createdAt"];
+	        this.lastDrainedAt = source["lastDrainedAt"];
 	    }
 	}
 	export class AwsCredentialsFile_NewInstanceCommandInput {
 	    filePath: string;
+	    awsProfileName: string;
 	    label: string;
+	    providerCode: string;
+	    providerId: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new AwsCredentialsFile_NewInstanceCommandInput(source);
@@ -27,7 +42,10 @@ export namespace awscredentialsfile {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.filePath = source["filePath"];
+	        this.awsProfileName = source["awsProfileName"];
 	        this.label = source["label"];
+	        this.providerCode = source["providerCode"];
+	        this.providerId = source["providerId"];
 	    }
 	}
 
@@ -63,6 +81,7 @@ export namespace awsidc {
 	        this.deviceCode = source["deviceCode"];
 	    }
 	}
+	
 	export class AwsIdc_FinalizeRefreshAccessTokenCommandInput {
 	    instanceId: string;
 	    region: string;
@@ -208,6 +227,7 @@ export namespace awsidc {
 	    isAccessTokenExpired: boolean;
 	    accessTokenExpiresIn: string;
 	    accounts: AwsIdentityCenterAccount[];
+	    sinks: plumbing.SinkInstance[];
 	
 	    static createFrom(source: any = {}) {
 	        return new AwsIdentityCenterCardData(source);
@@ -222,6 +242,7 @@ export namespace awsidc {
 	        this.isAccessTokenExpired = source["isAccessTokenExpired"];
 	        this.accessTokenExpiresIn = source["accessTokenExpiresIn"];
 	        this.accounts = this.convertValues(source["accounts"], AwsIdentityCenterAccount);
+	        this.sinks = this.convertValues(source["sinks"], plumbing.SinkInstance);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -271,6 +292,20 @@ export namespace main {
 	        this.password = source["password"];
 	    }
 	}
+	export class CompatibleSink {
+	    code: string;
+	    name: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CompatibleSink(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.code = source["code"];
+	        this.name = source["name"];
+	    }
+	}
 	export class FavoriteInstance {
 	    providerCode: string;
 	    instanceId: string;
@@ -301,20 +336,37 @@ export namespace main {
 	        this.iconSvgBase64 = source["iconSvgBase64"];
 	    }
 	}
-	export class Sink {
-	    code: string;
-	    name: string;
-	    iconSvgBase64: string;
+
+}
+
+export namespace plumbing {
+	
+	export class DisconnectSinkCommandInput {
+	    sinkCode: string;
+	    sinkId: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new Sink(source);
+	        return new DisconnectSinkCommandInput(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.code = source["code"];
-	        this.name = source["name"];
-	        this.iconSvgBase64 = source["iconSvgBase64"];
+	        this.sinkCode = source["sinkCode"];
+	        this.sinkId = source["sinkId"];
+	    }
+	}
+	export class SinkInstance {
+	    sinkCode: string;
+	    sinkId: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SinkInstance(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sinkCode = source["sinkCode"];
+	        this.sinkId = source["sinkId"];
 	    }
 	}
 

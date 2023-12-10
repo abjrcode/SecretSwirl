@@ -1,5 +1,7 @@
 package sinks
 
+import awscredentialsfile "github.com/abjrcode/swervo/sinks/aws_credentials_file"
+
 type SinkMeta struct {
 	Code          string
 	Name          string
@@ -7,13 +9,9 @@ type SinkMeta struct {
 }
 
 var (
-	AwsCredentialsFile = "aws-credentials-file"
-)
-
-var (
 	SupportedSinks = map[string]SinkMeta{
-		AwsCredentialsFile: {
-			Code: AwsCredentialsFile,
+		awscredentialsfile.SinkCode: {
+			Code: awscredentialsfile.SinkCode,
 			Name: "AWS Credentials File",
 		},
 	}

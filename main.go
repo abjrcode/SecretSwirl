@@ -104,18 +104,21 @@ func main() {
 	favoritesRepo := favorites.NewFavorites(db)
 	dashboardController := NewDashboardController(favoritesRepo)
 
-	awsIdcController := awsidc.NewAwsIdentityCenterController(db, eventBus, favoritesRepo, vault, awssso.NewAwsSsoOidcClient(), clock)
+	awsCredentialsFileSinkController := awscredentialsfile.NewAwsCredentialsFileSinkController(db, eventBus, vault, clock)
 
-	awsCredentialsFileController := awscredentialsfile.NewAwsCredentialsFileController(db, eventBus, vault, clock)
+	awsIdcController := awsidc.NewAwsIdentityCenterController(db, eventBus, favoritesRepo, vault, awssso.NewAwsSsoOidcClient(), clock)
+	awsIdcController.AddPlumbers(awsCredentialsFileSinkController)
 
 	appController := &AppController{
-		authController:               authController,
-		dashboardController:          dashboardController,
-		awsIdcController:             awsIdcController,
-		awsCredentialsFileController: awsCredentialsFileController,
+		authController:      authController,
+		dashboardController: dashboardController,
+
+		awsIdcController: awsIdcController,
+
+		awsCredentialsFileSinkController: awsCredentialsFileSinkController,
 	}
 
-	logger.Info().Msgf("PID [%d] - launching Swervo", os.Getpid())
+	logger.Info().Msgf("Launching Swervo - PID [%d]", os.Getpid())
 	if err := wails.Run(&options.App{
 		Title:  "Swervo",
 		Width:  1024,
@@ -126,14 +129,14 @@ func main() {
 		},
 		Logger: app.NewWailsLoggerAdapter(&logger),
 		OnStartup: func(ctx context.Context) {
-			appController.Init(logger.WithContext(ctx), errorHandler)
+			appController.init(logger.WithContext(ctx), errorHandler)
 		},
 		Bind: []interface{}{
 			appController,
 			authController,
 			dashboardController,
 			awsIdcController,
-			awsCredentialsFileController,
+			awsCredentialsFileSinkController,
 		},
 	}); err != nil {
 		errorHandler.Catch(nil, logger, errors.New("failed to launch Swervo"))
