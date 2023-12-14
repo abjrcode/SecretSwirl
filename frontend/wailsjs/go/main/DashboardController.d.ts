@@ -3,8 +3,8 @@
 import {app} from '../models';
 import {main} from '../models';
 
+export function ListCompatibleSinks(arg1:app.Context,arg2:string):Promise<Array<main.CompatibleSink>>;
+
 export function ListFavorites(arg1:app.Context):Promise<Array<main.FavoriteInstance>>;
 
 export function ListProviders():Promise<Array<main.Provider>>;
-
-export function ListSinks():Promise<Array<main.Sink>>;

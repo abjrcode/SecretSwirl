@@ -1,10 +1,11 @@
 import { useLoaderData } from "react-router-dom"
 import { AwsIdcCard } from "../providers/aws-idc/card"
 import { main } from "../../../wailsjs/go/models"
+import { ProviderCodes } from "../../utils/provider-sink-codes"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ProviderComponentMap = new Map<string, React.FC<any>>([
-  ["aws-idc", AwsIdcCard],
+  [ProviderCodes.AwsIdc, AwsIdcCard],
 ])
 
 export function Dashboard() {

@@ -10,8 +10,8 @@ export function IsVaultConfigured(arg1) {
   return window['go']['main']['AuthController']['IsVaultConfigured'](arg1);
 }
 
-export function LockVault() {
-  return window['go']['main']['AuthController']['LockVault']();
+export function LockVault(arg1) {
+  return window['go']['main']['AuthController']['LockVault'](arg1);
 }
 
 export function UnlockVault(arg1, arg2) {

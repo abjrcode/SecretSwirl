@@ -21,13 +21,12 @@ import { ToastProvider } from "./toast-provider/toast-provider"
 import { AwsIdcInstances } from "./routes/providers/aws-idc/instances"
 import { awsIdcInstancesData } from "./routes/providers/aws-idc/instances-data"
 import { Auth_IsVaultConfigured } from "./utils/ipc-adapter"
-import { Sinks } from "./routes/sinks/sinks"
-import { sinksLoader } from "./routes/sinks/sinks-data"
-import { AwsCredentialsFileInstances } from "./routes/sinks/aws-credentials-file/instances"
-import { awsCredentialsFileInstancesData } from "./routes/sinks/aws-credentials-file/instances-data"
-import { AwsCredentialsFileNew } from "./routes/sinks/aws-credentials-file/new"
+import { CompatibleSinks } from "./routes/sinks/compatible-sinks"
+import { AwsCredentialsFileSetup } from "./routes/sinks/aws-credentials-file/new"
 import { awsCredentialsFileSetupAction } from "./routes/sinks/aws-credentials-file/new-data"
 import { awsCredentialsFileCardLoader } from "./routes/sinks/aws-credentials-file/card-data"
+import { ProviderCodes, SinkCodes } from "./utils/provider-sink-codes"
+import { compatibleSinksLoader } from "./routes/sinks/compatible-sinks-data"
 
 const devMode = import.meta.env.DEV
 
@@ -54,7 +53,7 @@ void (async function main() {
           loader: providersLoader,
           children: [
             {
-              path: "aws-idc",
+              path: ProviderCodes.AwsIdc,
               children: [
                 {
                   index: true,
@@ -77,20 +76,15 @@ void (async function main() {
         },
         {
           path: "/sinks",
-          element: <Sinks />,
-          loader: sinksLoader,
+          element: <CompatibleSinks />,
+          loader: compatibleSinksLoader,
           children: [
             {
-              path: "aws-credentials-file",
+              path: SinkCodes.AwsCredentialsFile,
               children: [
                 {
-                  index: true,
-                  element: <AwsCredentialsFileInstances />,
-                  loader: awsCredentialsFileInstancesData,
-                },
-                {
-                  path: "setup",
-                  element: <AwsCredentialsFileNew />,
+                  path: "setup/:providerCode/:instanceId",
+                  element: <AwsCredentialsFileSetup />,
                   action: awsCredentialsFileSetupAction,
                 },
               ],
@@ -106,11 +100,11 @@ void (async function main() {
           path: "api",
           children: [
             {
-              path: "aws-idc-card",
+              path: `${ProviderCodes.AwsIdc}-card`,
               loader: awsIdcCardLoader,
             },
             {
-              path: "aws-credentials-file-card",
+              path: `${SinkCodes.AwsCredentialsFile}-card`,
               loader: awsCredentialsFileCardLoader,
             },
           ],

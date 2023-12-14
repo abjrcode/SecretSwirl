@@ -25,7 +25,7 @@ type EventEnvelope struct {
 	Id            uint64
 	EventType     string
 	EventVersion  uint
-	Data          interface{}
+	Event         interface{}
 	SourceType    EventSource
 	SourceId      string
 	UserId        string
@@ -87,7 +87,7 @@ func (bus *Eventbus) Publish(ctx app.Context, event interface{}, meta EventMeta)
 		Id:            0,
 		EventType:     reflect.TypeOf(event).Name(),
 		EventVersion:  meta.EventVersion,
-		Data:          event,
+		Event:         event,
 		SourceType:    meta.SourceType,
 		SourceId:      meta.SourceId,
 		CreatedAt:     uint64(bus.clock.NowUnix()),
@@ -96,7 +96,7 @@ func (bus *Eventbus) Publish(ctx app.Context, event interface{}, meta EventMeta)
 		CorrelationId: ctx.CorrelationId(),
 	}
 
-	eventPayload, err := json.Marshal(envelope.Data)
+	eventPayload, err := json.Marshal(envelope.Event)
 
 	if err != nil {
 		return err
@@ -142,7 +142,7 @@ func (bus *Eventbus) PublishTx(ctx app.Context, event interface{}, meta EventMet
 		Id:            0,
 		EventType:     reflect.TypeOf(event).Name(),
 		EventVersion:  meta.EventVersion,
-		Data:          event,
+		Event:         event,
 		SourceType:    meta.SourceType,
 		SourceId:      meta.SourceId,
 		CreatedAt:     uint64(bus.clock.NowUnix()),
@@ -151,7 +151,7 @@ func (bus *Eventbus) PublishTx(ctx app.Context, event interface{}, meta EventMet
 		CorrelationId: ctx.CorrelationId(),
 	}
 
-	eventPayload, err := json.Marshal(envelope.Data)
+	eventPayload, err := json.Marshal(envelope.Event)
 
 	if err != nil {
 		return nil, err

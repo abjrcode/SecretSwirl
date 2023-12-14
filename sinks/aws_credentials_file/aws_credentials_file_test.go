@@ -6,6 +6,7 @@ import (
 
 	"github.com/abjrcode/swervo/internal/eventing"
 	"github.com/abjrcode/swervo/internal/migrations"
+	"github.com/abjrcode/swervo/internal/plumbing"
 	"github.com/abjrcode/swervo/internal/security/vault"
 	"github.com/abjrcode/swervo/internal/testhelpers"
 	"github.com/stretchr/testify/require"
@@ -20,15 +21,18 @@ func TestNewInstance(t *testing.T) {
 
 	ctx := testhelpers.NewMockAppContext()
 
-	credFile := NewAwsCredentialsFileController(db, bus, encryptionService, mockClock)
+	credFile := NewAwsCredentialsFileSinkController(db, bus, encryptionService, mockClock)
 
 	dir := t.TempDir()
 	filePath := filepath.Join(dir, "credentials")
 	mockClock.On("NowUnix").Return(1)
 
 	instanceId, err := credFile.NewInstance(ctx, AwsCredentialsFile_NewInstanceCommandInput{
-		FilePath: filePath,
-		Label:    "default",
+		FilePath:       filePath,
+		AwsProfileName: "test-profile",
+		Label:          "default",
+		ProviderCode:   "some-provider-code",
+		ProviderId:     "some-provider-id",
 	})
 	require.NoError(t, err)
 
@@ -36,13 +40,14 @@ func TestNewInstance(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, &AwsCredentialsFileInstance{
-		InstanceId: instanceId,
-		FilePath:   filePath,
-		Label:      "default",
+		InstanceId:     instanceId,
+		FilePath:       filePath,
+		AwsProfileName: "test-profile",
+		Label:          "default",
 	}, instance)
 }
 
-func TestNewInstance_Error_AlreadyExists(t *testing.T) {
+func Test_DeleteInstance(t *testing.T) {
 	db, err := migrations.NewInMemoryMigratedDatabase(t, "aws_credentials_file_tests")
 	require.NoError(t, err)
 	mockClock := testhelpers.NewMockClock()
@@ -51,26 +56,32 @@ func TestNewInstance_Error_AlreadyExists(t *testing.T) {
 
 	ctx := testhelpers.NewMockAppContext()
 
-	credFile := NewAwsCredentialsFileController(db, bus, encryptionService, mockClock)
+	credFile := NewAwsCredentialsFileSinkController(db, bus, encryptionService, mockClock)
 
 	dir := t.TempDir()
 	filePath := filepath.Join(dir, "credentials")
 	mockClock.On("NowUnix").Return(1)
 
-	_, err = credFile.NewInstance(ctx, AwsCredentialsFile_NewInstanceCommandInput{
-		FilePath: filePath,
-		Label:    "default",
+	instanceId, err := credFile.NewInstance(ctx, AwsCredentialsFile_NewInstanceCommandInput{
+		FilePath:       filePath,
+		AwsProfileName: "default",
+		Label:          "default",
+		ProviderCode:   "some-provider-code",
+		ProviderId:     "some-provider-id",
 	})
 	require.NoError(t, err)
 
-	_, err = credFile.NewInstance(ctx, AwsCredentialsFile_NewInstanceCommandInput{
-		FilePath: filePath,
-		Label:    "default",
+	err = credFile.DisconnectSink(ctx, plumbing.DisconnectSinkCommandInput{
+		SinkCode: credFile.SinkCode(),
+		SinkId:   instanceId,
 	})
-	require.ErrorIs(t, err, ErrInstanceAlreadyRegistered)
+	require.NoError(t, err)
+
+	_, err = credFile.GetInstanceData(ctx, instanceId)
+	require.ErrorIs(t, err, ErrInstanceWasNotFound)
 }
 
-func TestListInstances(t *testing.T) {
+func Test_ListConnectedSinks(t *testing.T) {
 	db, err := migrations.NewInMemoryMigratedDatabase(t, "aws_credentials_file_tests")
 	require.NoError(t, err)
 	mockClock := testhelpers.NewMockClock()
@@ -79,30 +90,45 @@ func TestListInstances(t *testing.T) {
 
 	ctx := testhelpers.NewMockAppContext()
 
-	credFile := NewAwsCredentialsFileController(db, bus, encryptionService, mockClock)
+	credFile := NewAwsCredentialsFileSinkController(db, bus, encryptionService, mockClock)
 
 	dir := t.TempDir()
 	filePath := filepath.Join(dir, "credentials")
-	mockClock.On("NowUnix").Once().Return(1)
+	mockClock.On("NowUnix").Return(1)
 
-	firstInstance, err := credFile.NewInstance(ctx, AwsCredentialsFile_NewInstanceCommandInput{
-		FilePath: filePath,
-		Label:    "default",
+	instanceId, err := credFile.NewInstance(ctx, AwsCredentialsFile_NewInstanceCommandInput{
+		FilePath:       filePath,
+		AwsProfileName: "default",
+		Label:          "default",
+		ProviderCode:   "some-provider-code",
+		ProviderId:     "some-provider-id",
 	})
 	require.NoError(t, err)
 
-	mockClock.On("NowUnix").Once().Return(2)
-	filePath = filepath.Join(dir, "alt_credentials")
-	secondInstance, err := credFile.NewInstance(ctx, AwsCredentialsFile_NewInstanceCommandInput{
-		FilePath: filePath,
-		Label:    "alt",
-	})
+	instances, err := credFile.ListConnectedSinks(ctx, "some-provider-code", "some-provider-id")
 	require.NoError(t, err)
 
-	instances, err := credFile.ListInstances(ctx)
+	require.Equal(t, []plumbing.SinkInstance{{
+		SinkCode: SinkCode,
+		SinkId:   instanceId,
+	}}, instances)
+}
+
+func Test_ListConnectedSinks_WhenNoneExist(t *testing.T) {
+	db, err := migrations.NewInMemoryMigratedDatabase(t, "aws_credentials_file_tests")
+	require.NoError(t, err)
+	mockClock := testhelpers.NewMockClock()
+	bus := eventing.NewEventbus(db, mockClock)
+	encryptionService := vault.NewVault(db, bus, mockClock)
+
+	ctx := testhelpers.NewMockAppContext()
+
+	credFile := NewAwsCredentialsFileSinkController(db, bus, encryptionService, mockClock)
+
+	instances, err := credFile.ListConnectedSinks(ctx, "some-provider-code", "some-provider-id")
 	require.NoError(t, err)
 
-	require.Equal(t, []string{secondInstance, firstInstance}, instances)
+	require.Equal(t, []plumbing.SinkInstance{}, instances)
 }
 
 /*
