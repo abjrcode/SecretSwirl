@@ -7,6 +7,6 @@ export function ConfigureVault(arg1:app.Context,arg2:main.Auth_ConfigureVaultCom
 
 export function IsVaultConfigured(arg1:app.Context):Promise<boolean>;
 
-export function LockVault():Promise<void>;
+export function LockVault(arg1:app.Context):Promise<void>;
 
 export function UnlockVault(arg1:app.Context,arg2:main.Auth_UnlockCommandInput):Promise<boolean>;

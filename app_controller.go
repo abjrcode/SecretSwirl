@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/abjrcode/swervo/internal/app"
+	"github.com/abjrcode/swervo/internal/plumbing"
 	"github.com/abjrcode/swervo/internal/utils"
 	awsidc "github.com/abjrcode/swervo/providers/aws_idc"
 	awscredentialsfile "github.com/abjrcode/swervo/sinks/aws_credentials_file"
@@ -32,10 +33,10 @@ type AppController struct {
 
 	awsIdcController *awsidc.AwsIdentityCenterController
 
-	awsCredentialsFileController *awscredentialsfile.AwsCredentialsFileController
+	awsCredentialsFileSinkController *awscredentialsfile.AwsCredentialsFileSinkController
 }
 
-func (c *AppController) Init(ctx context.Context, errorHandler app.ErrorHandler) {
+func (c *AppController) init(ctx context.Context, errorHandler app.ErrorHandler) {
 	appMenu := menu.NewMenu()
 
 	logger := zerolog.Ctx(ctx).With().Str("component", "app_controller").Logger()
@@ -131,13 +132,13 @@ func (c *AppController) RunAppCommand(command string, commandInput map[string]an
 				Password: commandInput["password"].(string),
 			})
 	case "Auth_Lock":
-		c.authController.LockVault()
+		c.authController.LockVault(appContext)
 	case "Dashboard_ListProviders":
 		output = c.dashboardController.ListProviders()
+	case "Dashboard_ListCompatibleSinks":
+		output = c.dashboardController.ListCompatibleSinks(appContext, commandInput["providerCode"].(string))
 	case "Dashboard_ListFavorites":
 		output, err = c.dashboardController.ListFavorites(appContext)
-	case "Dashboard_ListSinks":
-		output = c.dashboardController.ListSinks()
 	case "AwsIdc_ListInstances":
 		output, err = c.awsIdcController.ListInstances(appContext)
 	case "AwsIdc_GetInstanceData":
@@ -182,23 +183,34 @@ func (c *AppController) RunAppCommand(command string, commandInput map[string]an
 				UserCode:   commandInput["userCode"].(string),
 				DeviceCode: commandInput["deviceCode"].(string),
 			})
-	case "AwsCredentialsFile_ListInstances":
-		output, err = c.awsCredentialsFileController.ListInstances(appContext)
 	case "AwsCredentialsFile_NewInstance":
-		output, err = c.awsCredentialsFileController.NewInstance(appContext,
+		output, err = c.awsCredentialsFileSinkController.NewInstance(appContext,
 			awscredentialsfile.AwsCredentialsFile_NewInstanceCommandInput{
-				FilePath: commandInput["filePath"].(string),
-				Label:    commandInput["label"].(string),
+				FilePath:       commandInput["filePath"].(string),
+				AwsProfileName: commandInput["awsProfileName"].(string),
+				Label:          commandInput["label"].(string),
+				ProviderCode:   commandInput["providerCode"].(string),
+				ProviderId:     commandInput["providerId"].(string),
 			})
 	case "AwsCredentialsFile_GetInstanceData":
-		output, err = c.awsCredentialsFileController.GetInstanceData(appContext,
-			commandInput["instanceId"].(string))
+		output, err = c.awsCredentialsFileSinkController.GetInstanceData(appContext,
+			commandInput["instanceId"].(string),
+		)
+	case "AwsCredentialsFile_DisconnectSink":
+		err = c.awsCredentialsFileSinkController.DisconnectSink(appContext, plumbing.DisconnectSinkCommandInput{
+			SinkCode: commandInput["sinkCode"].(string),
+			SinkId:   commandInput["sinkId"].(string),
+		})
 	default:
 		output, err = nil, errors.Join(ErrInvalidAppCommand, app.ErrFatal)
 	}
 
 	if errors.Is(err, app.ErrFatal) {
 		c.errorHandler.Catch(appContext, c.logger, err)
+	}
+
+	if errors.Is(err, app.ErrValidation) {
+		return output, errors.Unwrap(err)
 	}
 
 	return output, err

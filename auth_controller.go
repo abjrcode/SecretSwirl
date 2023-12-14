@@ -5,12 +5,9 @@ import (
 
 	"github.com/abjrcode/swervo/internal/app"
 	"github.com/abjrcode/swervo/internal/security/vault"
-	"github.com/rs/zerolog"
 )
 
 type AuthController struct {
-	logger zerolog.Logger
-
 	vault vault.Vault
 }
 
@@ -37,7 +34,7 @@ func check(err error) error {
 }
 
 func (c *AuthController) IsVaultConfigured(ctx app.Context) (bool, error) {
-	c.logger.Info().Msg("checking if vault is already configured")
+	ctx.Logger().Info().Msg("checking if vault is already configured")
 	isConfigured, err := c.vault.IsConfigured(ctx)
 
 	if check(err) != nil {
@@ -54,7 +51,7 @@ type Auth_ConfigureVaultCommandInput struct {
 // ConfigureVault sets up the vault with a master password. It is called when the user sets up the app for the first time.
 // After configuration, the vault is unsealed and ready to be used.
 func (c *AuthController) ConfigureVault(ctx app.Context, input Auth_ConfigureVaultCommandInput) error {
-	c.logger.Info().Msg("setting up vault with a master password")
+	ctx.Logger().Info().Msg("setting up vault with a master password")
 	err := c.vault.Configure(ctx, input.Password)
 
 	if check(err) != nil {
@@ -70,7 +67,7 @@ type Auth_UnlockCommandInput struct {
 
 // UnlockVault opens the vault with the given password. It is called when the user logs in.
 func (c *AuthController) UnlockVault(ctx app.Context, input Auth_UnlockCommandInput) (bool, error) {
-	c.logger.Info().Msg("attempting to unlock vault with a master password")
+	ctx.Logger().Info().Msg("attempting to unlock vault with a master password")
 	success, err := c.vault.Open(ctx, input.Password)
 
 	if check(err) != nil {
@@ -81,7 +78,7 @@ func (c *AuthController) UnlockVault(ctx app.Context, input Auth_UnlockCommandIn
 }
 
 // LockVault closes the vault and purges the key from memory. It is called when the user logs out.
-func (c *AuthController) LockVault() {
-	c.logger.Info().Msg("locking Vault")
+func (c *AuthController) LockVault(ctx app.Context) {
+	ctx.Logger().Info().Msg("locking Vault")
 	c.vault.Seal()
 }

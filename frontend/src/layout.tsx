@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react"
 import { useToaster } from "./toast-provider/toast-context"
 import { useAuth } from "./auth-provider/auth-context"
-import { LockVault } from "../wailsjs/go/main/AuthController"
 import { Link, useNavigate } from "react-router-dom"
+import { Auth_Lock } from "./utils/ipc-adapter"
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const toaster = useToaster()
@@ -20,7 +20,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }, [toaster])
 
   async function attemptLock() {
-    await LockVault()
+    await Auth_Lock()
 
     navigate("/")
     authContext.onVaultLocked()
@@ -56,11 +56,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 to="/providers"
                 className="btn btn-primary btn-outline capitalize">
                 providers
-              </Link>
-              <Link
-                to="/sinks"
-                className="btn btn-primary btn-outline capitalize">
-                sinks
               </Link>
             </nav>
 

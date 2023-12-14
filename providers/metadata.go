@@ -1,5 +1,7 @@
 package providers
 
+import awsidc "github.com/abjrcode/swervo/providers/aws_idc"
+
 type ProviderMeta struct {
 	Code          string
 	Name          string
@@ -7,13 +9,9 @@ type ProviderMeta struct {
 }
 
 var (
-	AwsIdc = "aws-idc"
-)
-
-var (
 	SupportedProviders = map[string]ProviderMeta{
-		AwsIdc: {
-			Code: AwsIdc,
+		awsidc.ProviderCode: {
+			Code: awsidc.ProviderCode,
 			Name: "AWS Identity Center",
 		},
 	}

@@ -5,7 +5,6 @@ import (
 
 	"github.com/abjrcode/swervo/internal/migrations"
 	"github.com/abjrcode/swervo/internal/testhelpers"
-	"github.com/abjrcode/swervo/providers"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,7 +15,7 @@ func TestAddFavorite(t *testing.T) {
 	repo := NewFavorites(db)
 
 	favorite := &Favorite{
-		ProviderCode: providers.AwsIdc,
+		ProviderCode: "some-provider",
 		InstanceId:   "some-nice-id",
 	}
 
@@ -39,7 +38,7 @@ func TestRemoveFavorite(t *testing.T) {
 	ctx := testhelpers.NewMockAppContext()
 
 	favorite := &Favorite{
-		ProviderCode: providers.AwsIdc,
+		ProviderCode: "some-provider",
 		InstanceId:   "some-nice-id",
 	}
 
@@ -69,7 +68,7 @@ func TestIsFavorite(t *testing.T) {
 	ctx := testhelpers.NewMockAppContext()
 
 	favorite := &Favorite{
-		ProviderCode: providers.AwsIdc,
+		ProviderCode: "some-provider",
 		InstanceId:   "some-nice-id",
 	}
 
@@ -81,7 +80,7 @@ func TestIsFavorite(t *testing.T) {
 	require.True(t, isFavorite)
 
 	isFavorite, err = repo.IsFavorite(ctx, &Favorite{
-		ProviderCode: providers.AwsIdc,
+		ProviderCode: "some-provider",
 		InstanceId:   "some-nice-id-2",
 	})
 	require.NoError(t, err)
