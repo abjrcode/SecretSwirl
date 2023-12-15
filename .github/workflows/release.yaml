@@ -18,16 +18,16 @@ jobs:
       packages: write
 
     with:
-      BASE_IMAGE: ghcr.io/abjrcode/cross-wails:v2.6.0
+      BASE_IMAGE: ghcr.io/abjrcode/cross-wails:v2.7.1
       BUILD_TYPE: "release"
 
   DarwinCI:
     uses: ./.github/workflows/build-darwin.yaml
 
     with:
-      GO_VERSION: "v1.21.1"
-      NODE_VERSION: "18"
-      WAILS_VERSION: "v2.6.0"
+      GO_VERSION: "v1.21.5"
+      NODE_VERSION: "20"
+      WAILS_VERSION: "v2.7.1"
       BUILD_TYPE: "release"
 
   Publish:
