@@ -11,7 +11,7 @@ Rotate your secrets and live worry free!
 
 - [Golang 1.21.x](https://go.dev/dl/)
 - [NodeJS 20.x.x](https://nodejs.org/en/) Recommended to use [nvm](https://github.com/nvm-sh/nvm#installing-and-updating) or [windows-nvm](https://github.com/coreybutler/nvm-windows#installation--upgrades) to manage NodeJS versions.
-- [Wails 2.7.x](https://wails.io/docs/gettingstarted/installation#platform-specific-dependencies)
+- [Wails 2.7.1](https://wails.io/docs/gettingstarted/installation#platform-specific-dependencies)
   - Then run `wails doctor` to ensure you have all the correct system-level dependencies installed.
 - [Mage](https://magefile.org/)
 - [CGO due to dependency on go-sqlite3](https://github.com/mattn/go-sqlite3#compilation)
