@@ -1,4 +1,4 @@
-package awscredentialsfile
+package awscredsfile
 
 import (
 	"testing"
@@ -33,25 +33,22 @@ func TestParse(t *testing.T) {
 
 	require.Equal(t, 3, len(credentials))
 
-	require.Equal(t, credentials[0], credential{
+	require.Equal(t, credentials[0], profileCredentials{
 		Profile:         "default",
 		AccessKeyID:     "YOUR_ACCESS_KEY",
 		SecretAccessKey: "YOUR_SECRET_KEY",
 		SessionToken:    nil,
-		Region:          utils.AddressOf("eu-west-1"),
-	}, credential{
+	}, profileCredentials{
 		Profile:         "profile_name",
 		AccessKeyID:     "ANOTHER_ACCESS_KEY",
 		SecretAccessKey: "ANOTHER_SECRET_KEY",
 		SessionToken:    utils.AddressOf("ANOTHER_SESSION_TOKEN"),
-		Region:          nil,
 	},
-		credential{
+		profileCredentials{
 			Profile:         "yet_another_profile",
 			AccessKeyID:     "yet_another_access_key",
 			SecretAccessKey: "yet_another_secret_key",
 			SessionToken:    utils.AddressOf("yet_another_session_token"),
-			Region:          utils.AddressOf("us-east-1"),
 		},
 	)
 }

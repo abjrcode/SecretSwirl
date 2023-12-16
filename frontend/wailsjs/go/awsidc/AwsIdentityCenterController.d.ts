@@ -6,19 +6,21 @@ import {awsidc} from '../models';
 
 export function AddPlumbers(arg1:Array<plumbing.Plumber[github>):Promise<void>;
 
+export function CopyRoleCredentials(arg1:app.Context,arg2:awsidc.AwsIdc_CopyRoleCredentialsCommandInput):Promise<void>;
+
 export function FinalizeRefreshAccessToken(arg1:app.Context,arg2:awsidc.AwsIdc_FinalizeRefreshAccessTokenCommandInput):Promise<void>;
 
 export function FinalizeSetup(arg1:app.Context,arg2:awsidc.AwsIdc_FinalizeSetupCommandInput):Promise<string>;
 
 export function GetInstanceData(arg1:app.Context,arg2:string,arg3:boolean):Promise<awsidc.AwsIdentityCenterCardData>;
 
-export function GetRoleCredentials(arg1:app.Context,arg2:awsidc.AwsIdc_GetRoleCredentialsCommandInput):Promise<awsidc.AwsIdentityCenterAccountRoleCredentials>;
-
 export function ListInstances(arg1:app.Context):Promise<Array<string>>;
 
 export function MarkAsFavorite(arg1:app.Context,arg2:string):Promise<void>;
 
 export function RefreshAccessToken(arg1:app.Context,arg2:string):Promise<awsidc.AuthorizeDeviceFlowResult>;
+
+export function SaveRoleCredentials(arg1:app.Context,arg2:awsidc.AwsIdc_SaveRoleCredentialsCommandInput):Promise<void>;
 
 export function Setup(arg1:app.Context,arg2:awsidc.AwsIdc_SetupCommandInput):Promise<awsidc.AuthorizeDeviceFlowResult>;
 
