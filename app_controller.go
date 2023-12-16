@@ -11,7 +11,7 @@ import (
 	"github.com/abjrcode/swervo/internal/plumbing"
 	"github.com/abjrcode/swervo/internal/utils"
 	awsidc "github.com/abjrcode/swervo/providers/aws_idc"
-	awscredentialsfile "github.com/abjrcode/swervo/sinks/aws_credentials_file"
+	awscredssink "github.com/abjrcode/swervo/sinks/awscredssink"
 	"github.com/rs/zerolog"
 	"github.com/wailsapp/wails/v2/pkg/menu"
 	"github.com/wailsapp/wails/v2/pkg/menu/keys"
@@ -33,7 +33,7 @@ type AppController struct {
 
 	awsIdcController *awsidc.AwsIdentityCenterController
 
-	awsCredentialsFileSinkController *awscredentialsfile.AwsCredentialsFileSinkController
+	awsCredentialsSinkController *awscredssink.AwsCredentialsSinkController
 }
 
 func (c *AppController) init(ctx context.Context, errorHandler app.ErrorHandler) {
@@ -145,12 +145,20 @@ func (c *AppController) RunAppCommand(command string, commandInput map[string]an
 		output, err = c.awsIdcController.GetInstanceData(appContext,
 			commandInput["instanceId"].(string),
 			commandInput["forceRefresh"].(bool))
-	case "AwsIdc_GetRoleCredentials":
-		output, err = c.awsIdcController.GetRoleCredentials(appContext,
-			awsidc.AwsIdc_GetRoleCredentialsCommandInput{
+	case "AwsIdc_CopyRoleCredentials":
+		err = c.awsIdcController.CopyRoleCredentials(appContext,
+			awsidc.AwsIdc_CopyRoleCredentialsCommandInput{
 				InstanceId: commandInput["instanceId"].(string),
 				AccountId:  commandInput["accountId"].(string),
 				RoleName:   commandInput["roleName"].(string),
+			})
+	case "AwsIdc_SaveRoleCredentials":
+		err = c.awsIdcController.SaveRoleCredentials(appContext,
+			awsidc.AwsIdc_SaveRoleCredentialsCommandInput{
+				InstanceId: commandInput["instanceId"].(string),
+				AccountId:  commandInput["accountId"].(string),
+				RoleName:   commandInput["roleName"].(string),
+				AwsProfile: commandInput["awsProfile"].(string),
 			})
 	case "AwsIdc_Setup":
 		output, err = c.awsIdcController.Setup(appContext,
@@ -183,21 +191,21 @@ func (c *AppController) RunAppCommand(command string, commandInput map[string]an
 				UserCode:   commandInput["userCode"].(string),
 				DeviceCode: commandInput["deviceCode"].(string),
 			})
-	case "AwsCredentialsFile_NewInstance":
-		output, err = c.awsCredentialsFileSinkController.NewInstance(appContext,
-			awscredentialsfile.AwsCredentialsFile_NewInstanceCommandInput{
+	case "AwsCredentialsSink_NewInstance":
+		output, err = c.awsCredentialsSinkController.NewInstance(appContext,
+			awscredssink.AwsCredentialsSink_NewInstanceCommandInput{
 				FilePath:       commandInput["filePath"].(string),
 				AwsProfileName: commandInput["awsProfileName"].(string),
 				Label:          commandInput["label"].(string),
 				ProviderCode:   commandInput["providerCode"].(string),
 				ProviderId:     commandInput["providerId"].(string),
 			})
-	case "AwsCredentialsFile_GetInstanceData":
-		output, err = c.awsCredentialsFileSinkController.GetInstanceData(appContext,
+	case "AwsCredentialsSink_GetInstanceData":
+		output, err = c.awsCredentialsSinkController.GetInstanceData(appContext,
 			commandInput["instanceId"].(string),
 		)
-	case "AwsCredentialsFile_DisconnectSink":
-		err = c.awsCredentialsFileSinkController.DisconnectSink(appContext, plumbing.DisconnectSinkCommandInput{
+	case "AwsCredentialsSink_DisconnectSink":
+		err = c.awsCredentialsSinkController.DisconnectSink(appContext, plumbing.DisconnectSinkCommandInput{
 			SinkCode: commandInput["sinkCode"].(string),
 			SinkId:   commandInput["sinkId"].(string),
 		})

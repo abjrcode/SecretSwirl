@@ -18,7 +18,7 @@ import (
 	"github.com/abjrcode/swervo/internal/security/vault"
 	"github.com/abjrcode/swervo/internal/utils"
 	awsidc "github.com/abjrcode/swervo/providers/aws_idc"
-	awscredentialsfile "github.com/abjrcode/swervo/sinks/aws_credentials_file"
+	awscredssink "github.com/abjrcode/swervo/sinks/awscredssink"
 
 	_ "github.com/golang-migrate/migrate/v4/database/sqlite3"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -104,7 +104,7 @@ func main() {
 	favoritesRepo := favorites.NewFavorites(db)
 	dashboardController := NewDashboardController(favoritesRepo)
 
-	awsCredentialsFileSinkController := awscredentialsfile.NewAwsCredentialsFileSinkController(db, eventBus, vault, clock)
+	awsCredentialsFileSinkController := awscredssink.NewAwsCredentialsSinkController(db, eventBus, vault, clock)
 
 	awsIdcController := awsidc.NewAwsIdentityCenterController(db, eventBus, favoritesRepo, vault, awssso.NewAwsSsoOidcClient(), clock)
 	awsIdcController.AddPlumbers(awsCredentialsFileSinkController)
@@ -115,7 +115,7 @@ func main() {
 
 		awsIdcController: awsIdcController,
 
-		awsCredentialsFileSinkController: awsCredentialsFileSinkController,
+		awsCredentialsSinkController: awsCredentialsFileSinkController,
 	}
 
 	logger.Info().Msgf("Launching Swervo - PID [%d]", os.Getpid())

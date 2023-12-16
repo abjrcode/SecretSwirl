@@ -1,10 +1,10 @@
-import { awscredentialsfile } from '../../../../wailsjs/go/models'
+import { awscredssink } from '../../../../wailsjs/go/models'
 import { ActionDataResult } from '../../../utils/action-data-result'
-import { AwsCredentialsFile_GetInstanceData } from '../../../utils/ipc-adapter'
+import { AwsCredentialsSink_GetInstanceData } from '../../../utils/ipc-adapter'
 
 export enum AwsCredentialsFileCardDataError { }
 
-export type AwsCredentialsFileCardDataResult = ActionDataResult<awscredentialsfile.AwsCredentialsFileInstance, AwsCredentialsFileCardDataError>
+export type AwsCredentialsFileCardDataResult = ActionDataResult<awscredssink.AwsCredentialsSinkInstance, AwsCredentialsFileCardDataError>
 
 export async function awsCredentialsFileCardLoader({ request }: { request: Request }): Promise<AwsCredentialsFileCardDataResult> {
   const instanceId = new URL(request.url).searchParams.get('instanceId')
@@ -14,7 +14,7 @@ export async function awsCredentialsFileCardLoader({ request }: { request: Reque
   }
 
   try {
-    return { success: true, result: await AwsCredentialsFile_GetInstanceData(instanceId) }
+    return { success: true, result: await AwsCredentialsSink_GetInstanceData(instanceId) }
   }
   catch (error) {
     switch (error) {

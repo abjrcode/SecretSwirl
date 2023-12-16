@@ -1,6 +1,6 @@
-export namespace awscredentialsfile {
+export namespace awscredssink {
 	
-	export class AwsCredentialsFileInstance {
+	export class AwsCredentialsSinkInstance {
 	    instanceId: string;
 	    version: number;
 	    filePath: string;
@@ -12,7 +12,7 @@ export namespace awscredentialsfile {
 	    lastDrainedAt?: number;
 	
 	    static createFrom(source: any = {}) {
-	        return new AwsCredentialsFileInstance(source);
+	        return new AwsCredentialsSinkInstance(source);
 	    }
 	
 	    constructor(source: any = {}) {
@@ -28,7 +28,7 @@ export namespace awscredentialsfile {
 	        this.lastDrainedAt = source["lastDrainedAt"];
 	    }
 	}
-	export class AwsCredentialsFile_NewInstanceCommandInput {
+	export class AwsCredentialsSink_NewInstanceCommandInput {
 	    filePath: string;
 	    awsProfileName: string;
 	    label: string;
@@ -36,7 +36,7 @@ export namespace awscredentialsfile {
 	    providerId: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new AwsCredentialsFile_NewInstanceCommandInput(source);
+	        return new AwsCredentialsSink_NewInstanceCommandInput(source);
 	    }
 	
 	    constructor(source: any = {}) {
@@ -82,6 +82,22 @@ export namespace awsidc {
 	    }
 	}
 	
+	export class AwsIdc_CopyRoleCredentialsCommandInput {
+	    instanceId: string;
+	    accountId: string;
+	    roleName: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AwsIdc_CopyRoleCredentialsCommandInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.instanceId = source["instanceId"];
+	        this.accountId = source["accountId"];
+	        this.roleName = source["roleName"];
+	    }
+	}
 	export class AwsIdc_FinalizeRefreshAccessTokenCommandInput {
 	    instanceId: string;
 	    region: string;
@@ -122,13 +138,14 @@ export namespace awsidc {
 	        this.deviceCode = source["deviceCode"];
 	    }
 	}
-	export class AwsIdc_GetRoleCredentialsCommandInput {
+	export class AwsIdc_SaveRoleCredentialsCommandInput {
 	    instanceId: string;
 	    accountId: string;
 	    roleName: string;
+	    awsProfile: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new AwsIdc_GetRoleCredentialsCommandInput(source);
+	        return new AwsIdc_SaveRoleCredentialsCommandInput(source);
 	    }
 	
 	    constructor(source: any = {}) {
@@ -136,6 +153,7 @@ export namespace awsidc {
 	        this.instanceId = source["instanceId"];
 	        this.accountId = source["accountId"];
 	        this.roleName = source["roleName"];
+	        this.awsProfile = source["awsProfile"];
 	    }
 	}
 	export class AwsIdc_SetupCommandInput {
@@ -201,24 +219,6 @@ export namespace awsidc {
 		}
 	}
 	
-	export class AwsIdentityCenterAccountRoleCredentials {
-	    accessKeyId: string;
-	    secretAccessKey: string;
-	    sessionToken: string;
-	    expiration: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new AwsIdentityCenterAccountRoleCredentials(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.accessKeyId = source["accessKeyId"];
-	        this.secretAccessKey = source["secretAccessKey"];
-	        this.sessionToken = source["sessionToken"];
-	        this.expiration = source["expiration"];
-	    }
-	}
 	export class AwsIdentityCenterCardData {
 	    instanceId: string;
 	    enabled: boolean;
