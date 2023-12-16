@@ -6,6 +6,10 @@ export function AddPlumbers(arg1) {
   return window['go']['awsidc']['AwsIdentityCenterController']['AddPlumbers'](arg1);
 }
 
+export function CopyRoleCredentials(arg1, arg2) {
+  return window['go']['awsidc']['AwsIdentityCenterController']['CopyRoleCredentials'](arg1, arg2);
+}
+
 export function FinalizeRefreshAccessToken(arg1, arg2) {
   return window['go']['awsidc']['AwsIdentityCenterController']['FinalizeRefreshAccessToken'](arg1, arg2);
 }
@@ -18,10 +22,6 @@ export function GetInstanceData(arg1, arg2, arg3) {
   return window['go']['awsidc']['AwsIdentityCenterController']['GetInstanceData'](arg1, arg2, arg3);
 }
 
-export function GetRoleCredentials(arg1, arg2) {
-  return window['go']['awsidc']['AwsIdentityCenterController']['GetRoleCredentials'](arg1, arg2);
-}
-
 export function ListInstances(arg1) {
   return window['go']['awsidc']['AwsIdentityCenterController']['ListInstances'](arg1);
 }
@@ -32,6 +32,10 @@ export function MarkAsFavorite(arg1, arg2) {
 
 export function RefreshAccessToken(arg1, arg2) {
   return window['go']['awsidc']['AwsIdentityCenterController']['RefreshAccessToken'](arg1, arg2);
+}
+
+export function SaveRoleCredentials(arg1, arg2) {
+  return window['go']['awsidc']['AwsIdentityCenterController']['SaveRoleCredentials'](arg1, arg2);
 }
 
 export function Setup(arg1, arg2) {

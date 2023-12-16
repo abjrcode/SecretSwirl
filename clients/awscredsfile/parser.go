@@ -1,4 +1,4 @@
-package awscredentialsfile
+package awscredsfile
 
 import (
 	"bufio"
@@ -6,19 +6,12 @@ import (
 	"strings"
 )
 
-var (
-	ErrInvalidCredentialsFile = errors.New("invalid credentials file")
-	ErrEmptyProfile           = errors.New("empty profile")
-	ErrEmptyKey               = errors.New("empty key")
-	ErrEmptyKeyValue          = errors.New("empty value")
-)
+type profileCredentials struct {
+	Profile string
 
-type credential struct {
-	Profile         string
 	AccessKeyID     string
 	SecretAccessKey string
 	SessionToken    *string
-	Region          *string
 }
 
 type parser struct {
@@ -31,8 +24,8 @@ func newParser(input string) *parser {
 	}
 }
 
-func (p *parser) parse() ([]credential, error) {
-	var credentials []credential
+func (p *parser) parse() ([]profileCredentials, error) {
+	var credentials []profileCredentials
 
 	for p.scanner.Scan() {
 		line := strings.TrimSpace(p.scanner.Text())
@@ -46,7 +39,7 @@ func (p *parser) parse() ([]credential, error) {
 			if profile == "" {
 				return nil, errors.Join(ErrEmptyProfile, ErrInvalidCredentialsFile)
 			}
-			credentials = append(credentials, credential{Profile: profile})
+			credentials = append(credentials, profileCredentials{Profile: profile})
 		} else {
 			parts := strings.SplitN(line, "=", 2)
 			if len(parts) == 2 {
@@ -68,8 +61,6 @@ func (p *parser) parse() ([]credential, error) {
 					credentials[len(credentials)-1].SecretAccessKey = value
 				case "aws_session_token":
 					credentials[len(credentials)-1].SessionToken = &value
-				case "region":
-					credentials[len(credentials)-1].Region = &value
 				}
 			}
 		}

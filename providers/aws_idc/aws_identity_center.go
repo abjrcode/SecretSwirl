@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"runtime"
 	"time"
 
+	"github.com/abjrcode/swervo/clients/awscredsfile"
 	"github.com/abjrcode/swervo/clients/awssso"
 	"github.com/abjrcode/swervo/favorites"
 	"github.com/abjrcode/swervo/internal/app"
@@ -19,6 +21,7 @@ import (
 	"github.com/coocood/freecache"
 	"github.com/dustin/go-humanize"
 	"github.com/segmentio/ksuid"
+	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 var ProviderCode = "aws-idc"
@@ -90,13 +93,6 @@ type AwsIdentityCenterAccount struct {
 	AccountId   string                         `json:"accountId"`
 	AccountName string                         `json:"accountName"`
 	Roles       []AwsIdentityCenterAccountRole `json:"roles"`
-}
-
-type AwsIdentityCenterAccountRoleCredentials struct {
-	AccessKeyId     string `json:"accessKeyId"`
-	SecretAccessKey string `json:"secretAccessKey"`
-	SessionToken    string `json:"sessionToken"`
-	Expiration      int64  `json:"expiration"`
 }
 
 type AwsIdentityCenterCardData struct {
@@ -287,14 +283,15 @@ func (c *AwsIdentityCenterController) GetInstanceData(ctx app.Context, instanceI
 	}, nil
 }
 
-type AwsIdc_GetRoleCredentialsCommandInput struct {
-	InstanceId string `json:"instanceId"`
-	AccountId  string `json:"accountId"`
-	RoleName   string `json:"roleName"`
+type awsRoleCredentials struct {
+	AccessKeyId     string
+	SecretAccessKey string
+	SessionToken    string
+	Expiration      int64
 }
 
-func (c *AwsIdentityCenterController) GetRoleCredentials(ctx app.Context, input AwsIdc_GetRoleCredentialsCommandInput) (*AwsIdentityCenterAccountRoleCredentials, error) {
-	row := c.db.QueryRowContext(ctx, "SELECT region, access_token_enc, access_token_created_at, access_token_expires_in, enc_key_id FROM aws_idc WHERE instance_id = ?", input.InstanceId)
+func (c *AwsIdentityCenterController) getRoleCredentials(ctx app.Context, instanceId, accountId, roleName string) (*awsRoleCredentials, error) {
+	row := c.db.QueryRowContext(ctx, "SELECT region, access_token_enc, access_token_created_at, access_token_expires_in, enc_key_id FROM aws_idc WHERE instance_id = ?", instanceId)
 
 	var region string
 	var accessTokenEnc string
@@ -316,19 +313,88 @@ func (c *AwsIdentityCenterController) GetRoleCredentials(ctx app.Context, input 
 		return nil, errors.Join(errors.New("failed to decrypt access token"), err, app.ErrFatal)
 	}
 
-	res, err := c.awsSsoClient.GetRoleCredentials(ctx, awssso.AwsRegion(region), input.AccountId, input.RoleName, accessToken)
+	res, err := c.awsSsoClient.GetRoleCredentials(ctx, awssso.AwsRegion(region), accountId, roleName, accessToken)
 
 	if err != nil {
 		ctx.Logger().Error().Err(err).Msg("failed to get role credentials")
 		return nil, errors.Join(err, app.ErrFatal)
 	}
 
-	return &AwsIdentityCenterAccountRoleCredentials{
+	return &awsRoleCredentials{
 		AccessKeyId:     res.AccessKeyId,
 		SecretAccessKey: res.SecretAccessKey,
 		SessionToken:    res.SessionToken,
 		Expiration:      res.Expiration,
 	}, nil
+}
+
+type AwsIdc_CopyRoleCredentialsCommandInput struct {
+	InstanceId string `json:"instanceId"`
+	AccountId  string `json:"accountId"`
+	RoleName   string `json:"roleName"`
+}
+
+func (c *AwsIdentityCenterController) CopyRoleCredentials(ctx app.Context, input AwsIdc_CopyRoleCredentialsCommandInput) error {
+	res, err := c.getRoleCredentials(ctx, input.InstanceId, input.AccountId, input.RoleName)
+
+	if err != nil {
+		return err
+	}
+
+	output := ""
+
+	if runtime.GOOS == "windows" {
+		output = fmt.Sprintf(`$Env:AWS_ACCESS_KEY_ID="%s"
+$Env:AWS_SECRET_ACCESS_KEY="%s"
+$Env:AWS_SESSION_TOKEN="%s"`, res.AccessKeyId, res.SecretAccessKey, res.SessionToken)
+	} else {
+		output = fmt.Sprintf(`export AWS_ACCESS_KEY_ID="%s"
+export AWS_SECRET_ACCESS_KEY="%s"
+export AWS_SESSION_TOKEN="%s"`, res.AccessKeyId, res.SecretAccessKey, res.SessionToken)
+	}
+
+	err = wailsRuntime.ClipboardSetText(ctx, output)
+
+	if err != nil {
+		ctx.Logger().Error().Err(err).Msg("failed to copy to clipboard")
+		return errors.Join(err, app.ErrFatal)
+	}
+
+	return nil
+}
+
+type AwsIdc_SaveRoleCredentialsCommandInput struct {
+	InstanceId string `json:"instanceId"`
+
+	AccountId  string `json:"accountId"`
+	RoleName   string `json:"roleName"`
+	AwsProfile string `json:"awsProfile"`
+}
+
+func (c *AwsIdentityCenterController) SaveRoleCredentials(ctx app.Context, input AwsIdc_SaveRoleCredentialsCommandInput) error {
+	result, err := c.getRoleCredentials(ctx, input.InstanceId, input.AccountId, input.RoleName)
+
+	if err != nil {
+		return err
+	}
+
+	credsFile := awscredsfile.NewDefaultCredentialsFileManager()
+
+	err = credsFile.WriteProfileCredentials(input.AwsProfile, awscredsfile.ProfileCreds{
+		AwsAccessKeyId:     result.AccessKeyId,
+		AwsSecretAccessKey: result.SecretAccessKey,
+		AwsSessionToken:    &result.SessionToken,
+	})
+
+	if err != nil {
+		if errors.Is(err, app.ErrValidation) {
+			return err
+		} else {
+			return errors.Join(err, app.ErrFatal)
+		}
+	}
+
+	return nil
 }
 
 func (c *AwsIdentityCenterController) validateStartUrl(startUrl string) error {

@@ -3,18 +3,16 @@
 import {app} from '../models';
 import {plumbing} from '../models';
 import {awsidc} from '../models';
-import {awscredentialsfile} from '../models';
+import {awscredssink} from '../models';
 
 export function DisconnectSink(arg1:app.Context,arg2:plumbing.DisconnectSinkCommandInput):Promise<void>;
 
 export function FlowData(arg1:app.Context,arg2:awsidc.AwsCredentials,arg3:string):Promise<void>;
 
-export function GetInstanceData(arg1:app.Context,arg2:string):Promise<awscredentialsfile.AwsCredentialsFileInstance>;
+export function GetInstanceData(arg1:app.Context,arg2:string):Promise<awscredssink.AwsCredentialsSinkInstance>;
 
 export function ListConnectedSinks(arg1:app.Context,arg2:string,arg3:string):Promise<Array<plumbing.SinkInstance>>;
 
-export function NewInstance(arg1:app.Context,arg2:awscredentialsfile.AwsCredentialsFile_NewInstanceCommandInput):Promise<string>;
+export function NewInstance(arg1:app.Context,arg2:awscredssink.AwsCredentialsSink_NewInstanceCommandInput):Promise<string>;
 
 export function SinkCode():Promise<string>;
-
-export function WriteProfileCredentials(arg1:string,arg2:awscredentialsfile.ProfileCreds):Promise<void>;

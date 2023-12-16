@@ -1,5 +1,5 @@
 import { RunAppCommand } from "../../wailsjs/go/main/AppController";
-import { awscredentialsfile, awsidc, main, plumbing } from "../../wailsjs/go/models";
+import { awscredssink, awsidc, main, plumbing } from "../../wailsjs/go/models";
 import { SinkCodes } from "./provider-sink-codes";
 
 export function Auth_IsVaultConfigured(): Promise<boolean> {
@@ -40,8 +40,11 @@ export function AwsIdc_GetInstanceData(instanceId: string, forceRefresh: boolean
     forceRefresh,
   })
 }
-export function AwsIdc_GetRoleCredentials(input: awsidc.AwsIdc_GetRoleCredentialsCommandInput): Promise<awsidc.AwsIdentityCenterAccountRoleCredentials> {
-  return RunAppCommand("AwsIdc_GetRoleCredentials", input)
+export function AwsIdc_CopyRoleCredentials(input: awsidc.AwsIdc_CopyRoleCredentialsCommandInput) {
+  return RunAppCommand("AwsIdc_CopyRoleCredentials", input)
+}
+export function AwsIdc_SaveRoleCredentials(input: awsidc.AwsIdc_SaveRoleCredentialsCommandInput) {
+  return RunAppCommand("AwsIdc_SaveRoleCredentials", input)
 }
 export function AwsIdc_Setup(input: awsidc.AwsIdc_SetupCommandInput): Promise<awsidc.AuthorizeDeviceFlowResult> {
   return RunAppCommand("AwsIdc_Setup", input)
@@ -65,15 +68,15 @@ export function AwsIdc_FinalizeRefreshAccessToken(input: awsidc.AwsIdc_FinalizeR
 export function Plumbing_DisconnectSink(input: plumbing.DisconnectSinkCommandInput) {
   switch (input.sinkCode) {
     case SinkCodes.AwsCredentialsFile:
-      return RunAppCommand("AwsCredentialsFile_DisconnectSink", input)
+      return RunAppCommand("AwsCredentialsSink_DisconnectSink", input)
     default:
       throw new Error(`DisconnectSink: unknown sink code [${input.sinkCode}]`)
   }
 }
 
-export function AwsCredentialsFile_NewInstance(input: awscredentialsfile.AwsCredentialsFile_NewInstanceCommandInput): Promise<string> {
-  return RunAppCommand("AwsCredentialsFile_NewInstance", input)
+export function AwsCredentialsFile_NewInstance(input: awscredssink.AwsCredentialsSink_NewInstanceCommandInput): Promise<string> {
+  return RunAppCommand("AwsCredentialsSink_NewInstance", input)
 }
-export function AwsCredentialsFile_GetInstanceData(instanceId: string): Promise<awscredentialsfile.AwsCredentialsFileInstance> {
-  return RunAppCommand("AwsCredentialsFile_GetInstanceData", { instanceId })
+export function AwsCredentialsSink_GetInstanceData(instanceId: string): Promise<awscredssink.AwsCredentialsSinkInstance> {
+  return RunAppCommand("AwsCredentialsSink_GetInstanceData", { instanceId })
 }
