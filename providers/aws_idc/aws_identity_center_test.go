@@ -626,14 +626,14 @@ func TestGetRoleCredentials(t *testing.T) {
 
 	ctx := testhelpers.NewMockAppContext()
 
-	roleCredentials, err := controller.GetRoleCredentials(ctx, AwsIdc_GetRoleCredentialsCommandInput{
-		InstanceId: instanceId,
-		AccountId:  accountId,
-		RoleName:   roleName,
-	})
+	roleCredentials, err := controller.getRoleCredentials(ctx,
+		instanceId,
+		accountId,
+		roleName,
+	)
 
 	require.NoError(t, err)
-	require.Equal(t, roleCredentials, &AwsIdentityCenterAccountRoleCredentials{
+	require.Equal(t, roleCredentials, &awsRoleCredentials{
 		AccessKeyId:     mockGetRoleCredentialsRes.AccessKeyId,
 		SecretAccessKey: mockGetRoleCredentialsRes.SecretAccessKey,
 		SessionToken:    mockGetRoleCredentialsRes.SessionToken,
