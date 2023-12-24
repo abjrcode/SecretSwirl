@@ -37,6 +37,10 @@ if (devMode) {
 console.log("starting frontend application ...")
 
 void (async function main() {
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Backspace" && e.target === document.body) e.preventDefault()
+  })
+
   const router = createHashRouter([
     {
       element: <Vault isVaultConfigured={await Auth_IsVaultConfigured()} />,

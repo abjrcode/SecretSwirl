@@ -89,6 +89,9 @@ export function AwsIdcSetup() {
           minLength={1}
           maxLength={50}
           className="input input-bordered input-primary w-96"
+          autoComplete="off"
+          autoCapitalize="off"
+          autoCorrect="off"
           placeholder="Personal AWS Account"
         />
         <button
