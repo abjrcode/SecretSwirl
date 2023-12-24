@@ -1,5 +1,8 @@
 # Swervo
 
+> [!NOTE]  
+> I am not actively working on this project. Read my [blog post](https://madin.dev/swervo/) if you're curious about it.
+
 ## About
 
 Rotate your secrets and live worry free!
