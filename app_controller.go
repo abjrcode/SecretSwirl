@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
 	"strings"
 
 	"github.com/abjrcode/swervo/internal/app"
@@ -46,22 +45,20 @@ func (c *AppController) init(ctx context.Context, errorHandler app.ErrorHandler)
 	c.errorHandler = errorHandler
 	c.mainMenu = appMenu
 
-	FileMenu := appMenu.AddSubmenu("File")
-	FileMenu.AddText("Quit", keys.CmdOrCtrl("q"), func(_ *menu.CallbackData) {
+	fileMenu := appMenu.AddSubmenu("File")
+	fileMenu.AddText("Quit", keys.CmdOrCtrl("q"), func(_ *menu.CallbackData) {
 		wailsRuntime.Quit(ctx)
 	})
 
-	if runtime.GOOS == "darwin" {
-		appMenu.Append(menu.EditMenu())
-	}
-
-	HelpMenu := appMenu.AddSubmenu("Help")
-	HelpMenu.AddText("About", keys.CmdOrCtrl("h"), func(_ *menu.CallbackData) {
+	helpMenu := appMenu.AddSubmenu("Help")
+	helpMenu.AddText("About", keys.CmdOrCtrl("h"), func(_ *menu.CallbackData) {
 		wailsRuntime.MessageDialog(ctx, wailsRuntime.MessageDialogOptions{
 			Title:   "About",
 			Message: fmt.Sprintf("Swervo %s\nBuilt @ %s\nCommit SHA: %s\nBuild Link: %s", Version, BuildTimestamp, CommitSha, BuildLink),
 		})
 	})
+
+	wailsRuntime.MenuSetApplicationMenu(ctx, appMenu)
 }
 
 func (c *AppController) ShowErrorDialog(msg string) {

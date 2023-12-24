@@ -123,7 +123,6 @@ func main() {
 		Title:  "Swervo",
 		Width:  1024,
 		Height: 768,
-		Menu:   appController.mainMenu,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
@@ -137,6 +136,9 @@ func main() {
 			dashboardController,
 			awsIdcController,
 			awsCredentialsFileSinkController,
+		},
+		SingleInstanceLock: &options.SingleInstanceLock{
+			UniqueId: "swervo_473c7f9b-8028-4888-871d-53c669266f80",
 		},
 	}); err != nil {
 		errorHandler.Catch(nil, logger, errors.New("failed to launch Swervo"))
