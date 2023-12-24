@@ -9,7 +9,7 @@ export function AwsIdcSetup() {
   const toaster = useToaster()
   const navigate = useNavigate()
 
-  const startUrl = "https://my-app.awsapps.com/start"
+  const startUrl = "https://<YOUR_APP>.awsapps.com/start"
   const awsRegion = "eu-central-1"
 
   const setupResult = useActionData() as AwsIdcSetupResult | undefined
@@ -68,8 +68,11 @@ export function AwsIdcSetup() {
         <input
           name="startUrl"
           type="url"
+          autoComplete="off"
+          autoCapitalize="off"
+          autoCorrect="off"
           className="input input-bordered input-primary w-96"
-          defaultValue={startUrl}
+          placeholder={startUrl}
         />
         <label className="label">
           <span className="label-text">AWS Region</span>
