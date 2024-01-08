@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"strings"
 
 	"github.com/abjrcode/swervo/internal/app"
@@ -49,6 +50,11 @@ func (c *AppController) init(ctx context.Context, errorHandler app.ErrorHandler)
 	fileMenu.AddText("Quit", keys.CmdOrCtrl("q"), func(_ *menu.CallbackData) {
 		wailsRuntime.Quit(ctx)
 	})
+
+	if runtime.GOOS == "darwin" {
+		// on macos platform, we should append EditMenu to enable Cmd+C,Cmd+V,Cmd+Z... shortcut
+		appMenu.Append(menu.EditMenu())
+	}
 
 	helpMenu := appMenu.AddSubmenu("Help")
 	helpMenu.AddText("About", keys.CmdOrCtrl("h"), func(_ *menu.CallbackData) {

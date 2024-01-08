@@ -78,11 +78,6 @@ func main() {
 	var db *sql.DB
 
 	if !generateBindingsRun {
-		db, err = dataStore.Open()
-		if err != nil {
-			errorHandler.CatchWithMsg(nil, logger, err, "failed to open database")
-		}
-		defer dataStore.Close(db)
 		migrationRunner, err := migrations.NewMigrationRunner(migrations.DefaultMigrationsFs, "scripts", dataStore, logger)
 
 		errorHandler.CatchWithMsg(nil, logger, err, "could not read migrations from embedded filesystem")
@@ -90,6 +85,12 @@ func main() {
 		if err := migrationRunner.RunSafe(); err != nil {
 			errorHandler.CatchWithMsg(nil, logger, err, "error when running migrations")
 		}
+
+		db, err = dataStore.Open()
+		if err != nil {
+			errorHandler.CatchWithMsg(nil, logger, err, "failed to open database")
+		}
+		defer dataStore.Close(db)
 	}
 
 	clock := utils.NewClock()
