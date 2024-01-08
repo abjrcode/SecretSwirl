@@ -32,7 +32,7 @@ func New(appDataDir, dbFileName string) AppStore {
 	dbFilePath = strings.ReplaceAll(dbFilePath, "\\", "/")
 
 	runner.dbFilePath = dbFilePath
-	runner.dbConnectionString = fmt.Sprintf("file:%s?mode=rwc&_locking=exclusive", dbFilePath)
+	runner.dbConnectionString = fmt.Sprintf("file:%s", dbFilePath)
 
 	return runner
 }
