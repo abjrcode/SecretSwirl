@@ -32,7 +32,6 @@ func SafelyOverwriteFile(filePath string, content string) error {
 	if err != nil {
 		return err
 	}
-	defer os.Remove(tempFile.Name())
 
 	_, err = tempFile.WriteString(content)
 	if err != nil {
@@ -40,6 +39,11 @@ func SafelyOverwriteFile(filePath string, content string) error {
 	}
 
 	err = tempFile.Sync()
+	if err != nil {
+		return err
+	}
+
+	err = tempFile.Close()
 	if err != nil {
 		return err
 	}

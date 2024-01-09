@@ -26,6 +26,9 @@ func TestWriteProfileCredentials(t *testing.T) {
 	require.NoError(t, err)
 
 	file, err := os.Open(filePath)
+	t.Cleanup(func() {
+		file.Close()
+	})
 	require.NoError(t, err)
 
 	token, err := io.ReadAll(file)
@@ -73,6 +76,9 @@ func TestWriteProfileCredentials_AlongExistingProfile(t *testing.T) {
 	require.NoError(t, err)
 
 	file, err = os.Open(filePath)
+	t.Cleanup(func() {
+		file.Close()
+	})
 	require.NoError(t, err)
 	token, err := io.ReadAll(file)
 	require.NoError(t, err)
@@ -108,6 +114,8 @@ func TestWriteProfileCredentials_OverrideExistingProfile(t *testing.T) {
 		aws_secret_access_key = test-secret-access-key
 	`)
 	require.NoError(t, err)
+	err = file.Close()
+	require.NoError(t, err)
 
 	manager := NewCredentialsFileManager(filePath)
 
@@ -121,6 +129,9 @@ func TestWriteProfileCredentials_OverrideExistingProfile(t *testing.T) {
 	require.NoError(t, err)
 
 	file, err = os.Open(filePath)
+	t.Cleanup(func() {
+		file.Close()
+	})
 	require.NoError(t, err)
 
 	token, err := io.ReadAll(file)
@@ -169,6 +180,9 @@ func TestWriteProfileCredentials_OverrideWithoutSessionToken(t *testing.T) {
 	require.NoError(t, err)
 
 	file, err = os.Open(filePath)
+	t.Cleanup(func() {
+		file.Close()
+	})
 	require.NoError(t, err)
 
 	token, err := io.ReadAll(file)
@@ -217,6 +231,9 @@ func TestWriteProfileCredentials_OverrideWithExistingRegion(t *testing.T) {
 	require.NoError(t, err)
 
 	file, err = os.Open(filePath)
+	t.Cleanup(func() {
+		file.Close()
+	})
 	require.NoError(t, err)
 
 	token, err := io.ReadAll(file)

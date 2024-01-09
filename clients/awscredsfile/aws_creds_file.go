@@ -44,25 +44,25 @@ func (manager *credentialsFileManager) WriteProfileCredentials(profileName strin
 
 	fileWasCreated := false
 
-	var file *os.File
+	var credentialsFileHandle *os.File
 
 	if _, err := os.Stat(credFilePath); os.IsNotExist(err) {
-		file, err = os.Create(credFilePath)
+		credentialsFileHandle, err = os.Create(credFilePath)
 		fileWasCreated = true
 
 		if err != nil {
 			return err
 		}
 	} else {
-		file, err = os.OpenFile(credFilePath, os.O_RDWR, 0644)
+		credentialsFileHandle, err = os.OpenFile(credFilePath, os.O_RDWR, 0644)
 		if err != nil {
 			return err
 		}
 	}
 
-	defer file.Close()
-
 	if fileWasCreated {
+		defer credentialsFileHandle.Close()
+
 		var builder strings.Builder
 
 		builder.WriteString(fmt.Sprintf("[%s]\n", profileName))
@@ -75,13 +75,13 @@ func (manager *credentialsFileManager) WriteProfileCredentials(profileName strin
 
 		credentialsProfile := builder.String()
 
-		_, err := file.WriteString(credentialsProfile)
+		_, err := credentialsFileHandle.WriteString(credentialsProfile)
 
 		if err != nil {
 			return err
 		}
 	} else {
-		credentialsProfile, err := io.ReadAll(file)
+		credentialsProfile, err := io.ReadAll(credentialsFileHandle)
 
 		if err != nil {
 			return err
@@ -115,13 +115,14 @@ func (manager *credentialsFileManager) WriteProfileCredentials(profileName strin
 			return err
 		}
 
-		err = file.Close()
+		credentialsFileName := credentialsFileHandle.Name()
 
+		err = credentialsFileHandle.Close()
 		if err != nil {
 			return err
 		}
 
-		err = utils.SafelyOverwriteFile(file.Name(), serializeCredentialsToString(credentials))
+		err = utils.SafelyOverwriteFile(credentialsFileName, serializeCredentialsToString(credentials))
 
 		if err != nil {
 			return err
