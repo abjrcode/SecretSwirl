@@ -34,6 +34,7 @@ var (
 	ErrDeviceAuthFlowTimedOut      = app.NewValidationError("DEVICE_AUTH_FLOW_TIMED_OUT")
 	ErrInstanceWasNotFound         = app.NewValidationError("INSTANCE_WAS_NOT_FOUND")
 	ErrInstanceAlreadyRegistered   = app.NewValidationError("INSTANCE_ALREADY_REGISTERED")
+	ErrStaleAwsAccessToken         = app.NewValidationError("STALE_AWS_ACCESS_TOKEN")
 	ErrTransientAwsClientError     = app.NewValidationError("TRANSIENT_AWS_CLIENT_ERROR")
 )
 
@@ -131,6 +132,20 @@ func (c *AwsIdentityCenterController) ListInstances(ctx app.Context) ([]string, 
 	}
 
 	return instances, nil
+}
+
+func (c *AwsIdentityCenterController) invalidateStaleAccessToken(ctx app.Context, instanceId string) error {
+	ctx.Logger().Trace().Msgf("invalidating stale access token for instance [%s]", instanceId)
+
+	c.cache.Del([]byte(instanceId))
+
+	_, err := c.db.ExecContext(ctx, "UPDATE aws_idc SET access_token_expires_in = 0 WHERE instance_id = ?", instanceId)
+
+	if err != nil {
+		return errors.Join(err, app.ErrFatal)
+	}
+
+	return nil
 }
 
 func (c *AwsIdentityCenterController) GetInstanceData(ctx app.Context, instanceId string, forceRefresh bool) (*AwsIdentityCenterCardData, error) {
@@ -235,6 +250,24 @@ func (c *AwsIdentityCenterController) GetInstanceData(ctx app.Context, instanceI
 	accountsOut, err := c.awsSsoClient.ListAccounts(ctx, awssso.AwsRegion(region), accessToken)
 
 	if err != nil {
+		if errors.Is(err, awssso.ErrAccessTokenExpired) {
+			ctx.Logger().Debug().Msgf("token for instance [%s] has expired", instanceId)
+
+			c.invalidateStaleAccessToken(ctx, instanceId)
+
+			return &AwsIdentityCenterCardData{
+				Enabled:              true,
+				InstanceId:           instanceId,
+				Label:                label,
+				IsFavorite:           isFavorite,
+				IsAccessTokenExpired: true,
+				AccessTokenExpiresIn: "stale",
+				Accounts:             make([]AwsIdentityCenterAccount, 0),
+
+				Sinks: sinks,
+			}, nil
+		}
+
 		ctx.Logger().Error().Err(err).Msg("aws sso client failed to list accounts")
 
 		return nil, ErrTransientAwsClientError
@@ -316,6 +349,14 @@ func (c *AwsIdentityCenterController) getRoleCredentials(ctx app.Context, instan
 	res, err := c.awsSsoClient.GetRoleCredentials(ctx, awssso.AwsRegion(region), accountId, roleName, accessToken)
 
 	if err != nil {
+		if errors.Is(err, awssso.ErrAccessTokenExpired) {
+			ctx.Logger().Debug().Msgf("token for instance [%s] has expired", instanceId)
+
+			c.invalidateStaleAccessToken(ctx, instanceId)
+
+			return nil, ErrStaleAwsAccessToken
+		}
+
 		ctx.Logger().Error().Err(err).Msg("failed to get role credentials")
 		return nil, errors.Join(err, app.ErrFatal)
 	}

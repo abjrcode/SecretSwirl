@@ -84,13 +84,26 @@ export function AwsIdcCard({ instanceId }: { instanceId: string }) {
     accountId: string,
     roleName: string,
   ) {
-    await AwsIdc_CopyRoleCredentials({
-      instanceId,
-      accountId,
-      roleName,
-    })
+    try {
+      await AwsIdc_CopyRoleCredentials({
+        instanceId,
+        accountId,
+        roleName,
+      })
 
-    toaster.showSuccess("Credentials copied to clipboard!")
+      toaster.showSuccess("Credentials copied to clipboard!")
+    } catch (e) {
+      switch (e) {
+        case "STALE_AWS_ACCESS_TOKEN":
+          toaster.showWarning(
+            "Your AWS access token has gone stale because you signed out through the AWS Console! Reloading ...",
+          )
+          validator.revalidate()
+          return
+        default:
+          toaster.showError("Something went wrong! Please try again.")
+      }
+    }
   }
 
   function openSaveDialog(accountId: string, roleName: string) {
@@ -124,6 +137,12 @@ export function AwsIdcCard({ instanceId }: { instanceId: string }) {
           toaster.showError(
             "Your AWS credentials file could not be parsed because it is not valid!",
           )
+          return
+        case "STALE_AWS_ACCESS_TOKEN":
+          toaster.showWarning(
+            "Your AWS access token has gone stale because you signed out through the AWS Console! Reloading ...",
+          )
+          validator.revalidate()
           return
         default:
           toaster.showError("Something went wrong! Please try again.")
@@ -291,7 +310,9 @@ export function AwsIdcCard({ instanceId }: { instanceId: string }) {
               <p className="badge badge-outline">
                 {!cardData.isAccessTokenExpired
                   ? `Expires in ${cardData.accessTokenExpiresIn}`
-                  : `Token expired ${cardData.accessTokenExpiresIn}`}
+                  : cardData.accessTokenExpiresIn !== "stale"
+                  ? `Token expired ${cardData.accessTokenExpiresIn}`
+                  : "Stale"}
               </p>
             </div>
           </div>

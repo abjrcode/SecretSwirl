@@ -584,6 +584,69 @@ func TestGetInstanceData(t *testing.T) {
 	require.Equal(t, "test-account-name-2", instanceData.Accounts[1].AccountName)
 }
 
+func TestGetInstance_AccessTokenExpired(t *testing.T) {
+	startUrl := "https://test-start-url.aws-apps.com/start"
+	region := "eu-west-1"
+	label := "test_label"
+
+	controller, mockAws, mockTimeProvider := initController(t)
+
+	instanceId := simulateSuccessfulSetup(t, controller, mockAws, mockTimeProvider, startUrl, region, label)
+
+	mockTimeProvider.On("NowUnix").Return(10)
+
+	ctx := testhelpers.NewMockAppContext()
+
+	data, err := controller.GetInstanceData(ctx, instanceId, false)
+
+	require.NoError(t, err)
+
+	require.Equal(t, instanceId, data.InstanceId)
+	require.Equal(t, label, data.Label)
+	require.Equal(t, true, data.IsAccessTokenExpired)
+	require.Empty(t, data.Accounts)
+}
+
+func TestGetInstanceData_StaleAccessToken(t *testing.T) {
+	startUrl := "https://test-start-url.aws-apps.com/start"
+	region := "eu-west-1"
+	label := "test_label"
+
+	controller, mockAws, mockTimeProvider := initController(t)
+
+	instanceId := simulateSuccessfulSetup(t, controller, mockAws, mockTimeProvider, startUrl, region, label)
+
+	mockTimeProvider.On("NowUnix").Return(3)
+
+	mockAws.On("ListAccounts").Return(nil, awssso.ErrAccessTokenExpired)
+
+	ctx := testhelpers.NewMockAppContext()
+
+	data, err := controller.GetInstanceData(ctx, instanceId, false)
+	require.NoError(t, err)
+
+	require.Equal(t, instanceId, data.InstanceId)
+	require.Equal(t, label, data.Label)
+	require.Equal(t, true, data.IsAccessTokenExpired)
+	require.Empty(t, data.Accounts)
+}
+
+func TestGetNonExistentInstance(t *testing.T) {
+	controller, mockAws, _ := initController(t)
+
+	mockRegRes := awssso.RegistrationResponse{
+		ClientId:     "test-client-id",
+		ClientSecret: "test-client-secret",
+		CreatedAt:    1,
+		ExpiresAt:    20,
+	}
+	mockAws.On("RegisterClient").Return(&mockRegRes, nil)
+
+	ctx := testhelpers.NewMockAppContext()
+	_, err := controller.GetInstanceData(ctx, "well-if-u-can-find-me-it-sucks", false)
+	require.Error(t, err, ErrInstanceWasNotFound)
+}
+
 func TestGetRoleCredentials(t *testing.T) {
 	startUrl := "https://test-start-url.aws-apps.com/start"
 	region := "eu-west-1"
@@ -641,43 +704,48 @@ func TestGetRoleCredentials(t *testing.T) {
 	})
 }
 
-func TestGetInstance_AccessTokenExpired(t *testing.T) {
+func TestGetRoleCredentials_StaleAccessToken(t *testing.T) {
 	startUrl := "https://test-start-url.aws-apps.com/start"
 	region := "eu-west-1"
 	label := "test_label"
+
+	roleName := "test-role-name"
+	accountId := "test-account-id"
 
 	controller, mockAws, mockTimeProvider := initController(t)
 
 	instanceId := simulateSuccessfulSetup(t, controller, mockAws, mockTimeProvider, startUrl, region, label)
 
-	mockTimeProvider.On("NowUnix").Return(10)
+	mockTimeProvider.On("NowUnix").Return(3)
 
-	ctx := testhelpers.NewMockAppContext()
-
-	data, err := controller.GetInstanceData(ctx, instanceId, false)
-
-	require.NoError(t, err)
-
-	require.Equal(t, instanceId, data.InstanceId)
-	require.Equal(t, label, data.Label)
-	require.Equal(t, true, data.IsAccessTokenExpired)
-	require.Empty(t, data.Accounts)
-}
-
-func TestGetNonExistentInstance(t *testing.T) {
-	controller, mockAws, _ := initController(t)
-
-	mockRegRes := awssso.RegistrationResponse{
-		ClientId:     "test-client-id",
-		ClientSecret: "test-client-secret",
-		CreatedAt:    1,
-		ExpiresAt:    20,
+	mockListAccountsRes := awssso.ListAccountsResponse{
+		Accounts: []awssso.AwsAccount{
+			{
+				AccountId:    accountId,
+				AccountName:  "test-account-name",
+				AccountEmail: "test-account-email",
+				Roles: []awssso.AwsAccountRole{
+					{
+						RoleName: roleName,
+					},
+				},
+			},
+		},
 	}
-	mockAws.On("RegisterClient").Return(&mockRegRes, nil)
+
+	mockAws.On("ListAccounts").Return(&mockListAccountsRes, nil)
+
+	mockAws.On("GetRoleCredentials").Return(nil, awssso.ErrAccessTokenExpired)
 
 	ctx := testhelpers.NewMockAppContext()
-	_, err := controller.GetInstanceData(ctx, "well-if-u-can-find-me-it-sucks", false)
-	require.Error(t, err, ErrInstanceWasNotFound)
+
+	_, err := controller.getRoleCredentials(ctx,
+		instanceId,
+		accountId,
+		roleName,
+	)
+
+	require.Error(t, ErrStaleAwsAccessToken, err)
 }
 
 func TestMarkInstanceAsFavorite(t *testing.T) {

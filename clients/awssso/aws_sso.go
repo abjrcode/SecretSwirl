@@ -40,7 +40,7 @@ var (
 	ErrInvalidRequest          = errors.New("request is not valid")
 	ErrDeviceFlowNotAuthorized = errors.New("device flow not authorized")
 	ErrDeviceCodeExpired       = errors.New("device code expired")
-	ErrAccessTokenExpired      = errors.New("device code expired")
+	ErrAccessTokenExpired      = errors.New("access token expired")
 )
 
 type AwsRegion string
@@ -244,6 +244,12 @@ func (c *awsSsoClientImpl) GetRoleCredentials(ctx app.Context, region AwsRegion,
 	})
 
 	if err != nil {
+		var ete *types.ExpiredTokenException
+
+		if errors.As(err, &ete) {
+			return nil, ErrAccessTokenExpired
+		}
+
 		return nil, err
 	}
 
