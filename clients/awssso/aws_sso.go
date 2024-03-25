@@ -6,6 +6,7 @@ import (
 	"github.com/abjrcode/swervo/internal/app"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sso"
+	ssotypes "github.com/aws/aws-sdk-go-v2/service/sso/types"
 	"github.com/aws/aws-sdk-go-v2/service/ssooidc"
 	"github.com/aws/aws-sdk-go-v2/service/ssooidc/types"
 )
@@ -41,6 +42,7 @@ var (
 	ErrDeviceFlowNotAuthorized = errors.New("device flow not authorized")
 	ErrDeviceCodeExpired       = errors.New("device code expired")
 	ErrAccessTokenExpired      = errors.New("access token expired")
+	ErrUnauthorizedAccessToken = errors.New("unauthorized access token")
 )
 
 type AwsRegion string
@@ -196,6 +198,12 @@ func (c *awsSsoClientImpl) ListAccounts(ctx app.Context, region AwsRegion, acces
 			return nil, ErrAccessTokenExpired
 		}
 
+		var ue *ssotypes.UnauthorizedException
+
+		if errors.As(err, &ue) {
+			return nil, ErrUnauthorizedAccessToken
+		}
+
 		return nil, err
 	}
 
@@ -248,6 +256,12 @@ func (c *awsSsoClientImpl) GetRoleCredentials(ctx app.Context, region AwsRegion,
 
 		if errors.As(err, &ete) {
 			return nil, ErrAccessTokenExpired
+		}
+
+		var ue *ssotypes.UnauthorizedException
+
+		if errors.As(err, &ue) {
+			return nil, ErrUnauthorizedAccessToken
 		}
 
 		return nil, err

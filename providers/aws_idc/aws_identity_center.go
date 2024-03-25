@@ -250,7 +250,7 @@ func (c *AwsIdentityCenterController) GetInstanceData(ctx app.Context, instanceI
 	accountsOut, err := c.awsSsoClient.ListAccounts(ctx, awssso.AwsRegion(region), accessToken)
 
 	if err != nil {
-		if errors.Is(err, awssso.ErrAccessTokenExpired) {
+		if errors.Is(err, awssso.ErrAccessTokenExpired) || errors.Is(err, awssso.ErrUnauthorizedAccessToken) {
 			ctx.Logger().Debug().Msgf("token for instance [%s] has expired", instanceId)
 
 			c.invalidateStaleAccessToken(ctx, instanceId)
@@ -349,7 +349,7 @@ func (c *AwsIdentityCenterController) getRoleCredentials(ctx app.Context, instan
 	res, err := c.awsSsoClient.GetRoleCredentials(ctx, awssso.AwsRegion(region), accountId, roleName, accessToken)
 
 	if err != nil {
-		if errors.Is(err, awssso.ErrAccessTokenExpired) {
+		if errors.Is(err, awssso.ErrAccessTokenExpired) || errors.Is(err, awssso.ErrUnauthorizedAccessToken) {
 			ctx.Logger().Debug().Msgf("token for instance [%s] has expired", instanceId)
 
 			c.invalidateStaleAccessToken(ctx, instanceId)

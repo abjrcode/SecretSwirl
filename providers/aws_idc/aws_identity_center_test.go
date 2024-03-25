@@ -607,7 +607,7 @@ func TestGetInstance_AccessTokenExpired(t *testing.T) {
 	require.Empty(t, data.Accounts)
 }
 
-func TestGetInstanceData_StaleAccessToken(t *testing.T) {
+func TestGetInstanceData_StaleAccessToken_DueToIncoherentCache(t *testing.T) {
 	startUrl := "https://test-start-url.aws-apps.com/start"
 	region := "eu-west-1"
 	label := "test_label"
@@ -619,6 +619,30 @@ func TestGetInstanceData_StaleAccessToken(t *testing.T) {
 	mockTimeProvider.On("NowUnix").Return(3)
 
 	mockAws.On("ListAccounts").Return(nil, awssso.ErrAccessTokenExpired)
+
+	ctx := testhelpers.NewMockAppContext()
+
+	data, err := controller.GetInstanceData(ctx, instanceId, false)
+	require.NoError(t, err)
+
+	require.Equal(t, instanceId, data.InstanceId)
+	require.Equal(t, label, data.Label)
+	require.Equal(t, true, data.IsAccessTokenExpired)
+	require.Empty(t, data.Accounts)
+}
+
+func TestGetInstanceData_StaleAccessToken_DueToUserAction(t *testing.T) {
+	startUrl := "https://test-start-url.aws-apps.com/start"
+	region := "eu-west-1"
+	label := "test_label"
+
+	controller, mockAws, mockTimeProvider := initController(t)
+
+	instanceId := simulateSuccessfulSetup(t, controller, mockAws, mockTimeProvider, startUrl, region, label)
+
+	mockTimeProvider.On("NowUnix").Return(3)
+
+	mockAws.On("ListAccounts").Return(nil, awssso.ErrUnauthorizedAccessToken)
 
 	ctx := testhelpers.NewMockAppContext()
 
@@ -704,7 +728,7 @@ func TestGetRoleCredentials(t *testing.T) {
 	})
 }
 
-func TestGetRoleCredentials_StaleAccessToken(t *testing.T) {
+func TestGetRoleCredentials_StaleAccessToken_DueToIncoherentCache(t *testing.T) {
 	startUrl := "https://test-start-url.aws-apps.com/start"
 	region := "eu-west-1"
 	label := "test_label"
@@ -736,6 +760,50 @@ func TestGetRoleCredentials_StaleAccessToken(t *testing.T) {
 	mockAws.On("ListAccounts").Return(&mockListAccountsRes, nil)
 
 	mockAws.On("GetRoleCredentials").Return(nil, awssso.ErrAccessTokenExpired)
+
+	ctx := testhelpers.NewMockAppContext()
+
+	_, err := controller.getRoleCredentials(ctx,
+		instanceId,
+		accountId,
+		roleName,
+	)
+
+	require.Error(t, ErrStaleAwsAccessToken, err)
+}
+
+func TestGetRoleCredentials_StaleAccessToken_DueToUserAction(t *testing.T) {
+	startUrl := "https://test-start-url.aws-apps.com/start"
+	region := "eu-west-1"
+	label := "test_label"
+
+	roleName := "test-role-name"
+	accountId := "test-account-id"
+
+	controller, mockAws, mockTimeProvider := initController(t)
+
+	instanceId := simulateSuccessfulSetup(t, controller, mockAws, mockTimeProvider, startUrl, region, label)
+
+	mockTimeProvider.On("NowUnix").Return(3)
+
+	mockListAccountsRes := awssso.ListAccountsResponse{
+		Accounts: []awssso.AwsAccount{
+			{
+				AccountId:    accountId,
+				AccountName:  "test-account-name",
+				AccountEmail: "test-account-email",
+				Roles: []awssso.AwsAccountRole{
+					{
+						RoleName: roleName,
+					},
+				},
+			},
+		},
+	}
+
+	mockAws.On("ListAccounts").Return(&mockListAccountsRes, nil)
+
+	mockAws.On("GetRoleCredentials").Return(nil, awssso.ErrUnauthorizedAccessToken)
 
 	ctx := testhelpers.NewMockAppContext()
 
